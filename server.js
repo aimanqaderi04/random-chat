@@ -688,6 +688,14 @@ io.on(
             socket.id
         );
 
+        /* =====================================================
+   ONLINE BENUTZER
+===================================================== */
+
+io.emit(
+    "online users",
+    io.engine.clientsCount
+);
 
         // -------------------------------------------------
         // BENUTZER-ID REGISTRIEREN
@@ -1439,6 +1447,12 @@ io.on(
                 socketUserIds.delete(
                     socket.id
                 );
+
+                io.emit(
+    "online users",
+    io.engine.clientsCount
+);
+
 
             }
         );
