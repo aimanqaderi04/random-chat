@@ -1462,6 +1462,55 @@ body {
 
 }
 
+.ban-box {
+    display: none;
+    margin-top: 20px;
+    padding: 22px;
+    border-radius: 18px;
+    text-align: center;
+
+    background: rgba(127, 29, 29, 0.18);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.ban-icon {
+    font-size: 38px;
+    margin-bottom: 8px;
+}
+
+.ban-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f87171;
+}
+
+.ban-subtitle {
+    margin-top: 8px;
+    color: #94a3b8;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ban-countdown {
+    margin-top: 18px;
+
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: 3px;
+
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+}
+
+.ban-label {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+    letter-spacing: 1px;
+}
+
 </style>
 
 </head>
@@ -1577,6 +1626,26 @@ body {
             🎲 Zufälligen Partner finden
 
         </button>
+
+        <div id="banBox" class="ban-box">
+    <div class="ban-icon">🚫</div>
+
+    <div class="ban-title">
+        Du wurdest für 2 Stunden gesperrt
+    </div>
+
+    <div class="ban-subtitle">
+        Du kannst Random Chat erst wieder nach Ablauf der Sperre benutzen.
+    </div>
+
+    <div id="banCountdown" class="ban-countdown">
+        02 : 00 : 00
+    </div>
+
+    <div class="ban-label">
+        Stunden&nbsp;&nbsp;·&nbsp;&nbsp;Minuten&nbsp;&nbsp;·&nbsp;&nbsp;Sekunden
+    </div>
+</div>
 
         <div
             id="searchBox"
@@ -3525,6 +3594,124 @@ socket.on(
     }
 );
 
+
+/* =====================================================
+   BENUTZER GESPERRT
+===================================================== */
+
+socket.on(
+    "user banned",
+    data => {
+
+        clearChat();
+
+        searching = false;
+
+        chatScreen.style.display =
+            "none";
+
+        startScreen.style.display =
+            "flex";
+
+        findBtn.style.display =
+            "none";
+
+        searchBox.style.display =
+            "none";
+
+
+        const banBox =
+            document.getElementById(
+                "banBox"
+            );
+
+        const banCountdown =
+            document.getElementById(
+                "banCountdown"
+            );
+
+
+        banBox.style.display =
+            "block";
+
+
+        let remaining =
+            data &&
+            typeof data.remaining === "number"
+                ? data.remaining
+                : 2 * 60 * 60 * 1000;
+
+
+        function updateCountdown() {
+
+            if (remaining <= 0) {
+
+                clearInterval(
+                    banTimer
+                );
+
+                banBox.style.display =
+                    "none";
+
+                findBtn.style.display =
+                    "block";
+
+                findBtn.disabled =
+                    false;
+
+                showToast(
+                    "✅ Deine Sperre ist abgelaufen."
+                );
+
+                return;
+            }
+
+
+            const totalSeconds =
+                Math.ceil(
+                    remaining / 1000
+                );
+
+
+            const hours =
+                Math.floor(
+                    totalSeconds / 3600
+                );
+
+
+            const minutes =
+                Math.floor(
+                    (totalSeconds % 3600) / 60
+                );
+
+
+            const seconds =
+                totalSeconds % 60;
+
+
+            banCountdown.textContent =
+                String(hours).padStart(2, "0") +
+                " : " +
+                String(minutes).padStart(2, "0") +
+                " : " +
+                String(seconds).padStart(2, "0");
+
+
+            remaining -= 1000;
+        }
+
+
+        updateCountdown();
+
+
+        const banTimer =
+            setInterval(
+                updateCountdown,
+                1000
+            );
+
+    }
+);
 
 /* =====================================================
    VERBINDUNG
