@@ -10,14 +10,14 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 
 // =====================================================
 // ORDNER
 // =====================================================
 
-const publicFolder = path.join(__dirname, "public");
+const publicFolder = __dirname;
 const uploadFolder = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadFolder)) {
