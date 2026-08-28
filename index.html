@@ -1621,6 +1621,10 @@ body {
 
         </div>
 
+        <div id="onlineUsers" class="online-users">
+    👥 0 Personen online
+</div>
+
         <button id="findBtn">
 
             🎲 Zufälligen Partner finden
@@ -3590,6 +3594,33 @@ socket.on(
         showToast(
             "⚠️ Meldung wurde gespeichert."
         );
+
+    }
+);
+
+/* =====================================================
+   ONLINE BENUTZER
+===================================================== */
+
+socket.on(
+    "online users",
+    count => {
+
+        const onlineUsers =
+            document.getElementById(
+                "onlineUsers"
+            );
+
+        if (onlineUsers) {
+
+            onlineUsers.textContent =
+                "👥 " +
+                count +
+                (count === 1
+                    ? " Person online"
+                    : " Personen online");
+
+        }
 
     }
 );
