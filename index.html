@@ -2,1549 +2,620 @@
 <html lang="de">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<meta charset="UTF-8">
+    <title>Random Chat</title>
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+    <style>
 
-<title>Random Chat</title>
+        * {
+            box-sizing: border-box;
+        }
 
-<style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b1220;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-* {
-    box-sizing: border-box;
-}
+        /* =========================
+           HEADER
+        ========================= */
 
-:root {
+        header {
+            height: 70px;
+            background: #111827;
+            border-bottom: 1px solid #263247;
 
-    --bg: #070914;
-    --panel: rgba(15,18,32,.92);
-    --panel2: #14192a;
-    --border: rgba(255,255,255,.09);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
 
-    --text: #f8fafc;
-    --muted: #94a3b8;
+            padding: 0 25px;
+        }
 
-    --accent: #6366f1;
-    --purple: #8b5cf6;
+        .logo {
+            font-size: 22px;
+            font-weight: bold;
+        }
 
-    --green: #22c55e;
-    --red: #ef4444;
-}
+        .online {
+            color: #4ade80;
+            font-size: 14px;
+        }
 
-html,
-body {
+        /* =========================
+           CHAT
+        ========================= */
 
-    width: 100%;
-    height: 100%;
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            height: calc(100vh - 70px);
 
-    margin: 0;
+            margin: auto;
 
-}
+            display: flex;
+            flex-direction: column;
+        }
 
-body {
+        .partner {
+            padding: 18px;
 
-    font-family:
-        Inter,
-        system-ui,
-        Arial,
-        sans-serif;
+            background: #172033;
+            border-bottom: 1px solid #263247;
 
-    color: var(--text);
+            font-weight: bold;
+        }
 
-    background: var(--bg);
+        .messages {
+            flex: 1;
 
-    overflow: hidden;
+            padding: 20px;
 
-}
+            overflow-y: auto;
 
+            display: flex;
+            flex-direction: column;
 
-/* =====================================================
-   HINTERGRUND
-===================================================== */
+            gap: 10px;
+        }
 
-.background {
+        .message {
+            max-width: 70%;
 
-    position: fixed;
+            padding: 12px 15px;
 
-    inset: 0;
+            border-radius: 15px;
 
-    z-index: -1;
+            word-wrap: break-word;
+        }
 
-    overflow: hidden;
+        .message.me {
+            align-self: flex-end;
+            background: #2563eb;
+        }
 
-}
+        .message.partner {
+            align-self: flex-start;
+            background: #1f2937;
+        }
 
-.orb {
+        .time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
 
-    position: absolute;
+        /* =========================
+           INPUT
+        ========================= */
 
-    border-radius: 50%;
+        .input-area {
+            padding: 15px;
 
-    filter: blur(90px);
+            background: #111827;
+            border-top: 1px solid #263247;
 
-    opacity: .18;
+            display: flex;
+            gap: 10px;
+        }
 
-    animation:
-        float 12s ease-in-out infinite;
+        .input-area input {
+            flex: 1;
 
-}
+            padding: 14px;
 
-.orb.one {
+            border: none;
+            outline: none;
 
-    width: 420px;
-    height: 420px;
+            border-radius: 10px;
 
-    background: #4f46e5;
+            background: #1f2937;
+            color: white;
 
-    left: -150px;
-    top: -150px;
+            font-size: 15px;
+        }
 
-}
+        button {
+            border: none;
 
-.orb.two {
+            padding: 12px 18px;
 
-    width: 380px;
-    height: 380px;
+            border-radius: 10px;
 
-    background: #9333ea;
+            cursor: pointer;
 
-    right: -120px;
-    bottom: -140px;
+            font-weight: bold;
+        }
 
-    animation-delay: -5s;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-}
+        .send {
+            background: #2563eb;
+            color: white;
+        }
 
-.orb.three {
+        .next {
+            background: #374151;
+            color: white;
+        }
 
-    width: 240px;
-    height: 240px;
+        .report {
+            background: #dc2626;
+            color: white;
+        }
 
-    background: #2563eb;
+        .block {
+            background: #4b5563;
+            color: white;
+        }
 
-    left: 45%;
-    top: 45%;
+        /* =========================
+           START SCREEN
+        ========================= */
 
-    animation-delay: -8s;
+        .start-screen {
+            position: fixed;
+            inset: 0;
 
-}
+            display: flex;
 
-@keyframes float {
+            justify-content: center;
+            align-items: center;
 
-    0%,100% {
-        transform: translate(0,0);
-    }
+            background:
+                radial-gradient(
+                    circle at 50% 40%,
+                    rgba(37, 99, 235, 0.12),
+                    transparent 40%
+                ),
+                #0b1220;
 
-    50% {
-        transform: translate(30px,-25px);
-    }
+            z-index: 10;
+        }
 
-}
+        .start-box {
+            width: 90%;
+            max-width: 500px;
 
+            padding: 45px 40px;
 
-/* =====================================================
-   START
-===================================================== */
+            text-align: center;
 
-#startScreen {
+            background: rgba(17, 24, 39, 0.95);
 
-    width: 100%;
-    height: 100%;
+            border: 1px solid #263247;
 
-    display: flex;
+            border-radius: 24px;
 
-    justify-content: center;
-    align-items: center;
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.45),
+                0 0 50px rgba(37, 99, 235, 0.08);
 
-    padding: 20px;
+            backdrop-filter: blur(12px);
+        }
 
-}
+        .start-icon {
+            width: 78px;
+            height: 78px;
 
-.start-card {
+            margin: 0 auto 20px;
 
-    width: 100%;
-    max-width: 560px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
 
-    padding: 45px 38px;
+            border-radius: 20px;
 
-    text-align: center;
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #3b82f6
+                );
 
-    border: 1px solid var(--border);
+            font-size: 42px;
 
-    border-radius: 30px;
+            box-shadow:
+                0 10px 30px
+                rgba(37, 99, 235, 0.35);
+        }
 
-    background: var(--panel);
+        .start-box h1 {
+            margin: 0;
 
-    backdrop-filter: blur(25px);
+            font-size: 38px;
+            font-weight: 800;
 
-    box-shadow:
-        0 35px 100px rgba(0,0,0,.55);
+            letter-spacing: -1px;
+        }
 
-}
+        .subtitle {
+            margin-top: 8px;
 
-.logo {
+            color: #93c5fd;
 
-    width: 105px;
-    height: 105px;
+            font-size: 17px;
+            font-weight: 600;
+        }
 
-    margin: 0 auto 24px;
+        .server-status {
+            display: inline-flex;
 
-    display: flex;
+            align-items: center;
 
-    align-items: center;
-    justify-content: center;
+            gap: 8px;
 
-    border-radius: 30px;
+            margin-top: 18px;
 
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
+            padding: 7px 13px;
 
-    font-size: 50px;
+            border-radius: 999px;
 
-}
+            background:
+                rgba(74, 222, 128, 0.08);
 
-.title {
+            border:
+                1px solid
+                rgba(74, 222, 128, 0.18);
 
-    margin: 0;
+            color: #4ade80;
 
-    font-size: 42px;
+            font-size: 13px;
+            font-weight: 600;
+        }
 
-    font-weight: 850;
+        .status-dot {
+            width: 8px;
+            height: 8px;
 
-}
+            border-radius: 50%;
 
-.gradient {
+            background: #4ade80;
 
-    background:
-        linear-gradient(
-            90deg,
-            #818cf8,
-            #a78bfa
-        );
+            box-shadow:
+                0 0 10px #4ade80;
+        }
 
-    -webkit-background-clip: text;
+        .start-description {
+            margin: 25px 0 0;
 
-    background-clip: text;
+            color: #aeb8c9;
 
-    color: transparent;
+            font-size: 15px;
 
-}
+            line-height: 1.6;
+        }
 
-.subtitle {
+        .start-button {
+            width: 100%;
 
-    margin-top: 14px;
+            margin-top: 28px;
 
-    color: var(--muted);
+            padding: 17px 20px;
 
-    line-height: 1.7;
+            display: flex;
 
-}
+            align-items: center;
+            justify-content: center;
 
-.server-status {
+            gap: 10px;
 
-    margin: 28px 0 20px;
+            border: none;
+            border-radius: 13px;
 
-    padding: 14px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #3b82f6
+                );
 
-    border:
-        1px solid var(--border);
+            color: white;
 
-    border-radius: 14px;
+            font-size: 17px;
+            font-weight: 700;
 
-    background:
-        rgba(255,255,255,.035);
+            cursor: pointer;
 
-}
+            box-shadow:
+                0 10px 25px
+                rgba(37, 99, 235, 0.25);
+        }
 
-.status-dot {
+        .button-arrow {
+            font-size: 21px;
+        }
 
-    display: inline-block;
+        .features {
+            display: flex;
 
-    width: 9px;
-    height: 9px;
+            justify-content: center;
 
-    margin-right: 7px;
+            gap: 22px;
 
-    border-radius: 50%;
+            margin-top: 25px;
 
-    background: var(--green);
+            padding-top: 22px;
 
-    box-shadow:
-        0 0 13px
-        rgba(34,197,94,.8);
+            border-top: 1px solid #263247;
+        }
 
-}
+        .feature {
+            display: flex;
 
-#findBtn {
+            align-items: center;
 
-    width: 100%;
+            gap: 6px;
 
-    padding: 18px;
+            color: #8994a8;
 
-    border: 0;
+            font-size: 12px;
+        }
 
-    border-radius: 16px;
+        .feature span:first-child {
+            color: #60a5fa;
+            font-size: 14px;
+        }
 
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
+        /* =========================
+           SUCHEN
+        ========================= */
 
-    color: white;
+        .searching {
+            display: none;
 
-    font-size: 17px;
+            position: fixed;
 
-    font-weight: 750;
+            inset: 0;
 
-    cursor: pointer;
+            background: #0b1220;
 
-}
+            justify-content: center;
+            align-items: center;
 
-#findBtn:disabled {
+            z-index: 20;
+        }
 
-    opacity: .6;
+        .search-box {
+            text-align: center;
+        }
 
-    cursor: wait;
+        .loader {
+            width: 45px;
+            height: 45px;
 
-}
+            border: 4px solid #374151;
 
-.search-box {
+            border-top-color: #2563eb;
 
-    display: none;
+            border-radius: 50%;
 
-    margin-top: 22px;
+            animation:
+                spin 1s linear infinite;
 
-    padding: 20px;
+            margin:
+                0 auto 20px;
+        }
 
-    border:
-        1px solid var(--border);
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
-    border-radius: 18px;
+        /* =========================
+           BAN
+        ========================= */
 
-    background:
-        rgba(255,255,255,.035);
+        #banOverlay {
+            position: fixed;
 
-}
+            inset: 0;
 
-.spinner {
+            background:
+                rgba(0, 0, 0, 0.85);
 
-    width: 38px;
-    height: 38px;
+            display: none;
 
-    margin: 0 auto 13px;
+            justify-content: center;
+            align-items: center;
 
-    border:
-        3px solid
-        rgba(255,255,255,.1);
+            z-index: 99999;
+        }
 
-    border-top-color: #818cf8;
+        #banBox {
+            width: 90%;
+            max-width: 430px;
 
-    border-radius: 50%;
+            background: #050505;
 
-    animation:
-        spin .8s linear infinite;
+            color: white;
 
-}
+            border: 1px solid #333;
 
-@keyframes spin {
+            border-radius: 18px;
 
-    to {
-        transform: rotate(360deg);
-    }
+            padding: 35px 30px;
 
-}
+            text-align: center;
 
-.privacy {
+            box-shadow:
+                0 20px 70px
+                rgba(0, 0, 0, 0.8);
+        }
 
-    margin-top: 20px;
+        .ban-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
 
-    color: #64748b;
+        #banBox h2 {
+            margin: 10px 0 20px;
+            font-size: 26px;
+        }
 
-    font-size: 12px;
+        .ban-text {
+            color: #aaa;
+            line-height: 1.5;
+        }
 
-}
+        .reason {
+            margin-top: 20px;
 
+            background: #111;
 
-/* =====================================================
-   CHAT
-===================================================== */
+            border-radius: 10px;
 
-#chatScreen {
+            padding: 14px;
+        }
 
-    display: none;
+        .reason-title {
+            color: #777;
 
-    width: 100%;
-    height: 100%;
+            font-size: 12px;
 
-    flex-direction: column;
+            text-transform: uppercase;
 
-}
+            margin-bottom: 5px;
+        }
 
-.topbar {
+        #banReason {
+            color: #fff;
+            word-break: break-word;
+        }
 
-    min-height: 72px;
+        .countdown {
+            margin-top: 25px;
 
-    flex-shrink: 0;
+            font-size: 42px;
 
-    padding: 0 20px;
+            font-weight: bold;
 
-    display: flex;
+            color: #ff4444;
 
-    align-items: center;
+            font-variant-numeric:
+                tabular-nums;
+        }
 
-    justify-content: space-between;
+        .remaining {
+            color: #777;
 
-    gap: 15px;
+            font-size: 13px;
 
-    background:
-        rgba(7,9,20,.86);
+            margin-top: 5px;
+        }
 
-    border-bottom:
-        1px solid var(--border);
+        /* =========================
+           TOAST
+        ========================= */
 
-    backdrop-filter: blur(22px);
+        #toast {
+            position: fixed;
 
-}
+            left: 50%;
+            bottom: 25px;
 
-.brand {
+            transform: translateX(-50%);
 
-    display: flex;
+            background: #111827;
 
-    align-items: center;
+            border: 1px solid #374151;
 
-    gap: 10px;
+            color: white;
 
-}
+            padding: 12px 18px;
 
-.brand-icon {
+            border-radius: 10px;
 
-    width: 42px;
-    height: 42px;
+            display: none;
 
-    display: flex;
+            z-index: 100000;
 
-    justify-content: center;
-    align-items: center;
+            box-shadow:
+                0 10px 30px
+                rgba(0,0,0,0.4);
+        }
 
-    border-radius: 12px;
+        /* =========================
+           MOBILE
+        ========================= */
 
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
+        @media (max-width: 650px) {
 
-}
+            header {
+                padding: 0 15px;
+            }
 
-.brand-name {
+            .message {
+                max-width: 85%;
+            }
 
-    font-weight: 800;
+            .features {
+                gap: 12px;
+            }
 
-}
+            .input-area {
+                padding: 10px;
+            }
 
-.connection {
+            .input-area button {
+                padding: 10px 12px;
+            }
+        }
 
-    display: flex;
+        @media (max-width: 600px) {
 
-    align-items: center;
+            .start-box {
+                padding: 35px 22px;
+                border-radius: 20px;
+            }
 
-    gap: 7px;
+            .start-box h1 {
+                font-size: 31px;
+            }
 
-    color: #86efac;
+            .start-icon {
+                width: 65px;
+                height: 65px;
 
-    font-size: 13px;
+                font-size: 34px;
+            }
 
-}
+            .feature {
+                font-size: 11px;
+            }
+        }
 
-.connection-dot {
-
-    width: 8px;
-    height: 8px;
-
-    border-radius: 50%;
-
-    background: var(--green);
-
-}
-
-.top-actions {
-
-    display: flex;
-
-    gap: 7px;
-
-    flex-wrap: wrap;
-
-    justify-content: flex-end;
-
-}
-
-.top-button {
-
-    border:
-        1px solid var(--border);
-
-    background:
-        rgba(255,255,255,.05);
-
-    color: white;
-
-    padding: 9px 12px;
-
-    border-radius: 10px;
-
-    cursor: pointer;
-
-}
-
-.top-button:hover {
-
-    background:
-        rgba(255,255,255,.1);
-
-}
-
-.danger:hover {
-
-    background:
-        rgba(239,68,68,.15);
-
-}
-
-.partner-bar {
-
-    flex-shrink: 0;
-
-    padding: 14px 20px;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    background:
-        rgba(255,255,255,.018);
-
-    border-bottom:
-        1px solid var(--border);
-
-}
-
-.avatar {
-
-    width: 44px;
-    height: 44px;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background:
-        linear-gradient(
-            135deg,
-            #334155,
-            #475569
-        );
-
-    font-size: 21px;
-
-}
-
-.partner-name {
-
-    font-weight: 750;
-
-    font-size: 14px;
-
-}
-
-.partner-status {
-
-    margin-top: 3px;
-
-    color: #86efac;
-
-    font-size: 12px;
-
-}
-
-
-/* =====================================================
-   NACHRICHTEN
-===================================================== */
-
-#messages {
-
-    flex: 1;
-
-    min-height: 0;
-
-    overflow-y: auto;
-
-    padding: 25px;
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 11px;
-
-}
-
-.message-row {
-
-    display: flex;
-
-}
-
-.message-row.mine {
-
-    justify-content: flex-end;
-
-}
-
-.message-content {
-
-    max-width:
-        min(72%,650px);
-
-}
-
-.message {
-
-    padding: 11px 15px;
-
-    border-radius: 17px;
-
-    background:
-        var(--panel2);
-
-    border:
-        1px solid var(--border);
-
-    line-height: 1.45;
-
-    word-break: break-word;
-
-}
-
-.message-row.mine .message {
-
-    background:
-        linear-gradient(
-            135deg,
-            #4f46e5,
-            #6366f1
-        );
-
-    border: 0;
-
-    border-bottom-right-radius: 5px;
-
-}
-
-.message-row:not(.mine)
-.message {
-
-    border-bottom-left-radius: 5px;
-
-}
-
-.time {
-
-    margin-top: 4px;
-
-    color: #64748b;
-
-    font-size: 10px;
-
-}
-
-.message-row.mine .time {
-
-    text-align: right;
-
-}
-
-.empty-message {
-
-    margin: auto;
-
-    text-align: center;
-
-    color: #64748b;
-
-}
-
-.empty-icon {
-
-    font-size: 42px;
-
-    margin-bottom: 10px;
-
-}
-
-
-/* =====================================================
-   DATEI
-===================================================== */
-
-.file-message {
-
-    min-width: 260px;
-
-}
-
-.file-preview {
-
-    position: relative;
-
-    overflow: hidden;
-
-    border-radius: 13px;
-
-    background: #090d18;
-
-    border:
-        1px solid
-        rgba(255,255,255,.08);
-
-}
-
-.file-preview img {
-
-    display: block;
-
-    width: 100%;
-
-    max-height: 350px;
-
-    object-fit: cover;
-
-}
-
-.file-preview.blurred img {
-
-    filter: blur(22px);
-
-    transform: scale(1.08);
-
-}
-
-.file-overlay {
-
-    position: absolute;
-
-    inset: 0;
-
-    display: flex;
-
-    flex-direction: column;
-
-    justify-content: center;
-
-    align-items: center;
-
-    gap: 9px;
-
-    background:
-        rgba(0,0,0,.38);
-
-    backdrop-filter: blur(4px);
-
-}
-
-.file-overlay strong {
-
-    font-size: 14px;
-
-}
-
-.open-file-btn {
-
-    border: 0;
-
-    border-radius: 10px;
-
-    padding: 9px 15px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
-
-    color: white;
-
-    cursor: pointer;
-
-}
-
-.file-info {
-
-    padding: 10px 2px 2px;
-
-}
-
-.file-name {
-
-    font-weight: 650;
-
-    word-break: break-all;
-
-}
-
-.file-size {
-
-    margin-top: 3px;
-
-    color: #94a3b8;
-
-    font-size: 11px;
-
-}
-
-.file-actions {
-
-    display: flex;
-
-    gap: 6px;
-
-    margin-top: 10px;
-
-}
-
-.file-action {
-
-    border:
-        1px solid
-        rgba(255,255,255,.1);
-
-    background:
-        rgba(255,255,255,.06);
-
-    color: white;
-
-    border-radius: 9px;
-
-    padding: 7px 10px;
-
-    cursor: pointer;
-
-    font-size: 12px;
-
-}
-
-.file-action:hover {
-
-    background:
-        rgba(255,255,255,.12);
-
-}
-
-.delete-file {
-
-    color: #fca5a5;
-
-}
-
-
-/* =====================================================
-   EINGABE
-===================================================== */
-
-.input-area {
-
-    position: relative;
-
-    flex-shrink: 0;
-
-    padding: 12px 18px;
-
-    display: flex;
-
-    gap: 8px;
-
-    background:
-        rgba(7,9,20,.92);
-
-    border-top:
-        1px solid var(--border);
-
-}
-
-.input-button {
-
-    width: 48px;
-
-    flex-shrink: 0;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 13px;
-
-    background:
-        var(--panel2);
-
-    color: white;
-
-    font-size: 21px;
-
-    cursor: pointer;
-
-}
-
-#messageInput {
-
-    flex: 1;
-
-    min-width: 0;
-
-    padding: 13px 15px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 13px;
-
-    outline: none;
-
-    background:
-        #101525;
-
-    color: white;
-
-    font-size: 15px;
-
-}
-
-#messageInput:focus {
-
-    border-color:
-        rgba(99,102,241,.7);
-
-}
-
-#sendBtn {
-
-    width: 50px;
-
-    flex-shrink: 0;
-
-    border: 0;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
-
-    color: white;
-
-    font-size: 19px;
-
-    cursor: pointer;
-
-}
-
-
-/* =====================================================
-   EMOJI
-===================================================== */
-
-#emojiPanel {
-
-    display: none;
-
-    position: absolute;
-
-    left: 18px;
-
-    bottom: 72px;
-
-    width: min(360px, calc(100vw - 30px));
-
-    max-height: 330px;
-
-    overflow-y: auto;
-
-    padding: 12px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 18px;
-
-    background:
-        #111525;
-
-    box-shadow:
-        0 20px 60px
-        rgba(0,0,0,.55);
-
-}
-
-.emoji-search {
-
-    width: 100%;
-
-    padding: 10px;
-
-    margin-bottom: 10px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 10px;
-
-    outline: none;
-
-    background:
-        #090d18;
-
-    color: white;
-
-}
-
-.emoji-categories {
-
-    display: flex;
-
-    gap: 5px;
-
-    overflow-x: auto;
-
-    margin-bottom: 10px;
-
-}
-
-.emoji-category {
-
-    border: 0;
-
-    background:
-        rgba(255,255,255,.06);
-
-    color: white;
-
-    border-radius: 9px;
-
-    padding: 7px 10px;
-
-    cursor: pointer;
-
-}
-
-.emoji-category.active {
-
-    background:
-        var(--accent);
-
-}
-
-.emoji-grid {
-
-    display: grid;
-
-    grid-template-columns:
-        repeat(8,1fr);
-
-    gap: 3px;
-
-}
-
-.emoji {
-
-    border: 0;
-
-    background: transparent;
-
-    padding: 8px 4px;
-
-    font-size: 22px;
-
-    border-radius: 8px;
-
-    cursor: pointer;
-
-}
-
-.emoji:hover {
-
-    background:
-        rgba(255,255,255,.09);
-
-}
-
-
-/* =====================================================
-   TOAST
-===================================================== */
-
-#toast {
-
-    position: fixed;
-
-    left: 50%;
-
-    bottom: 90px;
-
-    transform:
-        translateX(-50%)
-        translateY(20px);
-
-    padding: 12px 18px;
-
-    border-radius: 12px;
-
-    background:
-        #1e293b;
-
-    border:
-        1px solid var(--border);
-
-    color: white;
-
-    opacity: 0;
-
-    pointer-events: none;
-
-    transition: .25s;
-
-    z-index: 500;
-
-}
-
-#toast.show {
-
-    opacity: 1;
-
-    transform:
-        translateX(-50%)
-        translateY(0);
-
-}
-
-
-/* =====================================================
-   MODAL
-===================================================== */
-
-#modal {
-
-    display: none;
-
-    position: fixed;
-
-    inset: 0;
-
-    background:
-        rgba(0,0,0,.72);
-
-    align-items: center;
-
-    justify-content: center;
-
-    padding: 20px;
-
-    z-index: 600;
-
-}
-
-.modal-card {
-
-    width: 100%;
-
-    max-width: 440px;
-
-    padding: 25px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 20px;
-
-    background:
-        #111525;
-
-    box-shadow:
-        0 30px 80px
-        rgba(0,0,0,.6);
-
-}
-
-.modal-card h2 {
-
-    margin-top: 0;
-
-}
-
-.modal-card p {
-
-    color: var(--muted);
-
-    line-height: 1.5;
-
-}
-
-.report-select {
-
-    width: 100%;
-
-    margin-top: 12px;
-
-    padding: 12px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 10px;
-
-    background:
-        #090d18;
-
-    color: white;
-
-    outline: none;
-
-}
-
-.modal-buttons {
-
-    display: flex;
-
-    gap: 8px;
-
-    margin-top: 20px;
-
-}
-
-.modal-buttons button {
-
-    flex: 1;
-
-    padding: 12px;
-
-    border-radius: 10px;
-
-    border:
-        1px solid var(--border);
-
-    background:
-        #1e293b;
-
-    color: white;
-
-    cursor: pointer;
-
-}
-
-.modal-buttons .confirm {
-
-    background:
-        var(--accent);
-
-    border: 0;
-
-}
-
-.modal-buttons .red {
-
-    background:
-        #7f1d1d;
-
-    border: 0;
-
-}
-
-
-/* =====================================================
-   COOKIE
-===================================================== */
-
-#cookieOverlay {
-
-    display: flex;
-
-    position: fixed;
-
-    inset: 0;
-
-    z-index: 1000;
-
-    align-items: center;
-
-    justify-content: center;
-
-    padding: 20px;
-
-    background:
-        rgba(0,0,0,.78);
-
-    backdrop-filter: blur(8px);
-
-}
-
-.cookie-card {
-
-    width: 100%;
-
-    max-width: 480px;
-
-    padding: 28px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 22px;
-
-    background:
-        #111525;
-
-    box-shadow:
-        0 30px 100px
-        rgba(0,0,0,.7);
-
-}
-
-.cookie-card h2 {
-
-    margin-top: 0;
-
-}
-
-.cookie-card p {
-
-    color: var(--muted);
-
-    line-height: 1.6;
-
-}
-
-.cookie-info {
-
-    padding: 12px;
-
-    margin: 15px 0;
-
-    border-radius: 12px;
-
-    background:
-        rgba(255,255,255,.04);
-
-    font-size: 13px;
-
-    color: #cbd5e1;
-
-}
-
-#acceptCookies {
-
-    width: 100%;
-
-    padding: 13px;
-
-    border: 0;
-
-    border-radius: 12px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--accent),
-            var(--purple)
-        );
-
-    color: white;
-
-    font-size: 15px;
-
-    font-weight: 700;
-
-    cursor: pointer;
-
-}
-
-
-/* =====================================================
-   RESPONSIVE
-===================================================== */
-
-@media(max-width:800px) {
-
-    .connection {
-        display: none;
-    }
-
-    .topbar {
-        padding: 8px 10px;
-        min-height: auto;
-    }
-
-    .brand-name {
-        display: none;
-    }
-
-    .top-actions {
-        gap: 4px;
-    }
-
-    .top-button {
-        padding: 8px;
-        font-size: 12px;
-    }
-
-}
-
-@media(max-width:600px) {
-
-    .start-card {
-        padding: 32px 20px;
-    }
-
-    .title {
-        font-size: 32px;
-    }
-
-    .logo {
-        width: 85px;
-        height: 85px;
-        font-size: 40px;
-    }
-
-    #messages {
-        padding: 15px;
-    }
-
-    .message-content {
-        max-width: 88%;
-    }
-
-    .input-area {
-        padding: 8px;
-    }
-
-    .emoji-grid {
-        grid-template-columns:
-            repeat(7,1fr);
-    }
-
-}
-
-
-/* =====================================================
-   COOKIE VERSTECKT
-===================================================== */
-
-.cookie-hidden {
-
-    display: none !important;
-
-}
-
-.ban-box {
-    display: none;
-    margin-top: 20px;
-    padding: 22px;
-    border-radius: 18px;
-    text-align: center;
-
-    background: rgba(127, 29, 29, 0.18);
-    border: 1px solid rgba(248, 113, 113, 0.35);
-
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-}
-
-.ban-icon {
-    font-size: 38px;
-    margin-bottom: 8px;
-}
-
-.ban-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #f87171;
-}
-
-.ban-subtitle {
-    margin-top: 8px;
-    color: #94a3b8;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.ban-countdown {
-    margin-top: 18px;
-
-    font-size: 38px;
-    font-weight: 800;
-    letter-spacing: 3px;
-
-    color: #ffffff;
-    font-variant-numeric: tabular-nums;
-}
-
-.ban-label {
-    margin-top: 4px;
-    font-size: 11px;
-    color: #64748b;
-    letter-spacing: 1px;
-}
-
-/* =====================================================
-   ONLINE BENUTZER
-===================================================== */
-
-.online-users {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-
-    margin: 14px auto 18px;
-    width: fit-content;
-
-    padding: 8px 16px;
-
-    border-radius: 999px;
-
-    background: rgba(99, 102, 241, 0.10);
-    border: 1px solid rgba(129, 140, 248, 0.20);
-
-    color: #c7d2fe;
-
-    font-size: 13px;
-    font-weight: 600;
-
-    box-shadow:
-        0 4px 15px rgba(0, 0, 0, 0.12);
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease;
-}
-
-</style>
+    </style>
 
 </head>
 
@@ -1552,465 +623,178 @@ body {
 <body>
 
 
-<!-- =====================================================
-     HINTERGRUND
-===================================================== -->
+<header>
 
-<div class="background">
+    <div class="logo">
+        🎲 Random Chat
+    </div>
 
-    <div class="orb one"></div>
+    <div class="online">
 
-    <div class="orb two"></div>
+        <span id="headerStatusDot">
+            🟢
+        </span>
 
-    <div class="orb three"></div>
+        <span id="onlineUsers">
+            0
+        </span>
 
-</div>
-
-
-<!-- =====================================================
-     COOKIE
-===================================================== -->
-
-<div id="cookieOverlay">
-
-    <div class="cookie-card">
-
-        <h2>
-            🍪 Willkommen bei Random Chat
-        </h2>
-
-        <p>
-            Bevor du Random Chat benutzt,
-            benötigen wir deine Zustimmung
-            für die notwendigen Browserdaten.
-        </p>
-
-        <div class="cookie-info">
-
-            🆔 Ein anonymer Geräte-Code wird
-            in deinem Browser gespeichert.
-
-            <br><br>
-
-            Er wird verwendet, damit dein
-            Browser bei späteren Besuchen
-            wiedererkannt werden kann.
-
-            <br><br>
-
-            Deine Chat-ID wird nicht als
-            Benutzername angezeigt.
-
-        </div>
-
-        <button id="acceptCookies">
-
-            ✅ Akzeptieren
-
-        </button>
+        online
 
     </div>
 
-</div>
+</header>
 
 
-<!-- =====================================================
-     START
-===================================================== -->
-
-<section id="startScreen">
-
-    <div class="start-card">
-
-        <div class="logo">
-            🎲
-        </div>
-
-        <h1 class="title">
-
-            <span class="gradient">
-                Random Chat
-            </span>
-
-        </h1>
-
-        <div class="subtitle">
-
-            Triff zufällig eine andere Person
-            und chatte direkt miteinander.
-
-            <br>
-
-            Keine Registrierung.
-            Kein Benutzername.
-
-        </div>
-
-        <div class="server-status">
-
-            <span class="status-dot"></span>
-
-            Server ist online
-
-        </div>
-
-        <div id="onlineUsers" class="online-users">
-    👥 0 Personen online
-</div>
-
-        <button id="findBtn">
-
-            🎲 Zufälligen Partner finden
-
-        </button>
-
-        <div id="banBox" class="ban-box">
-    <div class="ban-icon">🚫</div>
-
-    <div class="ban-title">
-        Du wurdest für 2 Stunden gesperrt
-    </div>
-
-    <div class="ban-subtitle">
-        Du kannst Random Chat erst wieder nach Ablauf der Sperre benutzen.
-    </div>
-
-    <div id="banCountdown" class="ban-countdown">
-        02 : 00 : 00
-    </div>
-
-    <div class="ban-label">
-        Stunden&nbsp;&nbsp;·&nbsp;&nbsp;Minuten&nbsp;&nbsp;·&nbsp;&nbsp;Sekunden
-    </div>
-</div>
-
-        <div
-            id="searchBox"
-            class="search-box"
-        >
-
-            <div class="spinner"></div>
-
-            <strong>
-                Suche nach einem Partner
-            </strong>
-
-            <div
-                id="searchText"
-                style="
-                    color:#94a3b8;
-                    margin-top:6px;
-                "
-            >
-
-                Einen Moment...
-
-            </div>
-
-        </div>
-
-        <div class="privacy">
-
-            🛡️ 1-zu-1 · Keine öffentliche Chat-Liste
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
+<!-- =========================
      CHAT
-===================================================== -->
+========================= -->
 
-<section id="chatScreen">
+<div class="chat-container">
 
-
-    <header class="topbar">
-
-
-        <div class="brand">
-
-            <div class="brand-icon">
-                🎲
-            </div>
-
-            <div class="brand-name">
-                Random Chat
-            </div>
-
-        </div>
-
-
-        <div class="connection">
-
-            <span class="connection-dot"></span>
-
-            <span id="status">
-                Verbunden
-            </span>
-
-        </div>
-
-
-        <div class="top-actions">
-
-            <button
-                id="reportBtn"
-                class="top-button"
-            >
-                ⚠️ Melden
-            </button>
-
-            <button
-                id="blockBtn"
-                class="top-button"
-            >
-                🚫 Blockieren
-            </button>
-
-            <button
-                id="leaveBtn"
-                class="top-button danger"
-            >
-                🚪 Verlassen
-            </button>
-
-            <button
-                id="nextBtn"
-                class="top-button"
-            >
-                🔄 Nächster
-            </button>
-
-        </div>
-
-    </header>
-
-
-    <div class="partner-bar">
-
-        <div class="avatar">
-            👤
-        </div>
-
-        <div>
-
-            <div class="partner-name">
-                Zufälliger Partner
-            </div>
-
-            <div class="partner-status">
-                ● Online
-            </div>
-
-        </div>
-
+    <div
+        class="partner"
+        id="partnerStatus"
+    >
+        Kein Partner
     </div>
 
 
-    <main id="messages">
-
-        <div
-            id="emptyMessage"
-            class="empty-message"
-        >
-
-            <div class="empty-icon">
-                💬
-            </div>
-
-            Du kannst jetzt chatten.
-
-        </div>
-
-    </main>
+    <div
+        class="messages"
+        id="messages"
+    ></div>
 
 
     <div class="input-area">
-
-
-        <div id="emojiPanel">
-
-            <input
-                id="emojiSearch"
-                class="emoji-search"
-                placeholder="Emoji suchen..."
-            >
-
-            <div
-                class="emoji-categories"
-            >
-
-                <button
-                    class="emoji-category active"
-                    data-category="smileys"
-                >
-                    😀
-                </button>
-
-                <button
-                    class="emoji-category"
-                    data-category="people"
-                >
-                    👋
-                </button>
-
-                <button
-                    class="emoji-category"
-                    data-category="animals"
-                >
-                    🐶
-                </button>
-
-                <button
-                    class="emoji-category"
-                    data-category="food"
-                >
-                    🍕
-                </button>
-
-                <button
-                    class="emoji-category"
-                    data-category="objects"
-                >
-                    💡
-                </button>
-
-                <button
-                    class="emoji-category"
-                    data-category="symbols"
-                >
-                    ❤️
-                </button>
-
-            </div>
-
-            <div
-                id="emojiGrid"
-                class="emoji-grid"
-            ></div>
-
-        </div>
-
-
-        <button
-            id="emojiBtn"
-            class="input-button"
-            title="Emoji"
-        >
-            😊
-        </button>
-
-
-        <button
-            id="fileBtn"
-            class="input-button"
-            title="Bild oder Dokument senden"
-        >
-            📎
-        </button>
-
-
-        <input
-            id="fileInput"
-            type="file"
-            hidden
-        >
-
 
         <input
             id="messageInput"
             type="text"
             placeholder="Nachricht schreiben..."
             autocomplete="off"
-            maxlength="2000"
+            disabled
         >
 
-
-        <button id="sendBtn">
-            ➤
+        <button
+            class="send"
+            id="sendButton"
+            disabled
+        >
+            Senden
         </button>
 
     </div>
 
-</section>
+
+    <div
+        class="input-area"
+        style="padding-top: 0;"
+    >
+
+        <button
+            class="next"
+            id="nextButton"
+            disabled
+        >
+            Nächster
+        </button>
+
+        <button
+            class="block"
+            id="blockButton"
+            disabled
+        >
+            🚫 Blockieren
+        </button>
+
+        <button
+            class="report"
+            id="reportButton"
+            disabled
+        >
+            🚩 Melden
+        </button>
+
+    </div>
+
+</div>
 
 
-<!-- =====================================================
-     TOAST
-===================================================== -->
+<!-- =========================
+     START
+========================= -->
 
-<div id="toast"></div>
+<div
+    class="start-screen"
+    id="startScreen"
+>
+
+    <div class="start-box">
+
+        <div class="start-icon">
+            🎲
+        </div>
 
 
-<!-- =====================================================
-     MODAL
-===================================================== -->
+        <h1>
+            Random Chat
+        </h1>
 
-<div id="modal">
 
-    <div class="modal-card">
+        <div class="subtitle">
+            Partner-Suche
+        </div>
 
-        <h2 id="modalTitle">
-            Aktion
-        </h2>
 
-        <p id="modalText">
-            Möchtest du fortfahren?
+        <div class="server-status">
+
+            <span class="status-dot"></span>
+
+            <span id="serverStatus">
+                Server online
+            </span>
+
+        </div>
+
+
+        <p class="start-description">
+            Chatte anonym mit einer zufälligen Person.
         </p>
 
 
-        <select
-            id="reportReason"
-            class="report-select"
-            style="display:none;"
+        <button
+            class="start-button"
+            id="startButton"
         >
 
-            <option value="">
-                Grund auswählen
-            </option>
+            <span>
+                Partner suchen
+            </span>
 
-            <option value="Unangemessener Inhalt">
-                Unangemessener Inhalt
-            </option>
+            <span class="button-arrow">
+                →
+            </span>
 
-            <option value="Belästigung">
-                Belästigung
-            </option>
-
-            <option value="Beleidigung">
-                Beleidigung
-            </option>
-
-            <option value="Spam">
-                Spam
-            </option>
-
-            <option value="Betrug oder Täuschung">
-                Betrug oder Täuschung
-            </option>
-
-            <option value="Anderer Grund">
-                Anderer Grund
-            </option>
-
-        </select>
+        </button>
 
 
-        <div class="modal-buttons">
+        <div class="features">
 
-            <button id="cancelModal">
-                Abbrechen
-            </button>
+            <div class="feature">
+                <span>⚡</span>
+                <span>Schnell</span>
+            </div>
 
-            <button
-                id="confirmModal"
-                class="confirm"
-            >
-                Bestätigen
-            </button>
+            <div class="feature">
+                <span>1:1</span>
+                <span>1 zu 1</span>
+            </div>
+
+            <div class="feature">
+                <span>✓</span>
+                <span>Keine Anmeldung</span>
+            </div>
 
         </div>
 
@@ -2019,1721 +803,958 @@ body {
 </div>
 
 
+<!-- =========================
+     SUCHEN
+========================= -->
+
+<div
+    class="searching"
+    id="searching"
+>
+
+    <div class="search-box">
+
+        <div class="loader"></div>
+
+        <h2>
+            Partner wird gesucht...
+        </h2>
+
+        <p>
+            Einen Moment bitte.
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     BAN
+========================= -->
+
+<div id="banOverlay">
+
+    <div id="banBox">
+
+        <div class="ban-icon">
+            🔒
+        </div>
+
+        <h2>
+            Du bist gesperrt
+        </h2>
+
+        <div class="ban-text">
+            Du kannst den Chat momentan nicht benutzen.
+        </div>
+
+        <div class="reason">
+
+            <div class="reason-title">
+                Grund
+            </div>
+
+            <div id="banReason">
+                Verstoß gegen die Chatregeln
+            </div>
+
+        </div>
+
+        <div
+            class="countdown"
+            id="banCountdown"
+        >
+            02:00:00
+        </div>
+
+        <div class="remaining">
+            verbleibende Sperrzeit
+        </div>
+
+    </div>
+
+</div>
+
+
+<div id="toast"></div>
+
+
+<!-- =========================
+     SOCKET.IO
+========================= -->
+
 <script src="/socket.io/socket.io.js"></script>
 
 
 <script>
 
-
-/* =====================================================
-   SOCKET
-===================================================== */
-
-const socket = io();
+    const socket = io();
 
 
-/* =====================================================
-   GERÄTE-ID
-===================================================== */
+    // =========================
+    // ELEMENTE
+    // =========================
 
-let deviceId =
-    localStorage.getItem(
-        "randomChatDeviceId"
-    );
+    const startScreen =
+        document.getElementById("startScreen");
 
-if (!deviceId) {
+    const startButton =
+        document.getElementById("startButton");
 
-    deviceId =
-        crypto.randomUUID();
+    const searching =
+        document.getElementById("searching");
 
-    localStorage.setItem(
-        "randomChatDeviceId",
-        deviceId
-    );
+    const messages =
+        document.getElementById("messages");
 
-}
+    const messageInput =
+        document.getElementById("messageInput");
 
+    const sendButton =
+        document.getElementById("sendButton");
 
-/* =====================================================
-   BENUTZER REGISTRIEREN
-===================================================== */
+    const nextButton =
+        document.getElementById("nextButton");
 
-socket.emit(
-    "register user",
-    deviceId
-);
+    const reportButton =
+        document.getElementById("reportButton");
 
+    const blockButton =
+        document.getElementById("blockButton");
 
-/* =====================================================
-   COOKIE
-===================================================== */
+    const partnerStatus =
+        document.getElementById("partnerStatus");
 
-const cookieOverlay =
-    document.getElementById(
-        "cookieOverlay"
-    );
+    const onlineUsers =
+        document.getElementById("onlineUsers");
 
-const acceptCookies =
-    document.getElementById(
-        "acceptCookies"
-    );
+    const banOverlay =
+        document.getElementById("banOverlay");
 
+    const banReason =
+        document.getElementById("banReason");
 
-if (
-    localStorage.getItem(
-        "randomChatCookiesAccepted"
-    ) === "yes"
-) {
+    const banCountdown =
+        document.getElementById("banCountdown");
 
-    cookieOverlay.classList.add(
-        "cookie-hidden"
-    );
+    const serverStatus =
+        document.getElementById("serverStatus");
 
-}
+    const statusDot =
+        document.querySelector(".status-dot");
+
+    const toast =
+        document.getElementById("toast");
 
 
-acceptCookies.addEventListener(
-    "click",
-    () => {
+    // =========================
+    // VARIABLEN
+    // =========================
 
-        localStorage.setItem(
-            "randomChatCookiesAccepted",
-            "yes"
-        );
+    let isBanned = false;
 
-        cookieOverlay.classList.add(
-            "cookie-hidden"
-        );
+    let banTimer = null;
+
+    let connectedToPartner = false;
+
+
+    // =========================
+    // TOAST
+    // =========================
+
+    function showToast(text) {
+
+        toast.textContent = text;
+
+        toast.style.display = "block";
+
+
+        setTimeout(() => {
+
+            toast.style.display = "none";
+
+        }, 3000);
 
     }
-);
 
 
-/* =====================================================
-   ELEMENTE
-===================================================== */
+    // =========================
+    // SERVER VERBINDUNG
+    // =========================
 
-const startScreen =
-    document.getElementById(
-        "startScreen"
-    );
-
-const chatScreen =
-    document.getElementById(
-        "chatScreen"
-    );
-
-const findBtn =
-    document.getElementById(
-        "findBtn"
-    );
-
-const nextBtn =
-    document.getElementById(
-        "nextBtn"
-    );
-
-const leaveBtn =
-    document.getElementById(
-        "leaveBtn"
-    );
-
-const blockBtn =
-    document.getElementById(
-        "blockBtn"
-    );
-
-const reportBtn =
-    document.getElementById(
-        "reportBtn"
-    );
-
-const status =
-    document.getElementById(
-        "status"
-    );
-
-const messages =
-    document.getElementById(
-        "messages"
-    );
-
-const messageInput =
-    document.getElementById(
-        "messageInput"
-    );
-
-const sendBtn =
-    document.getElementById(
-        "sendBtn"
-    );
-
-const emojiBtn =
-    document.getElementById(
-        "emojiBtn"
-    );
-
-const emojiPanel =
-    document.getElementById(
-        "emojiPanel"
-    );
-
-const emojiGrid =
-    document.getElementById(
-        "emojiGrid"
-    );
-
-const emojiSearch =
-    document.getElementById(
-        "emojiSearch"
-    );
-
-const fileBtn =
-    document.getElementById(
-        "fileBtn"
-    );
-
-const fileInput =
-    document.getElementById(
-        "fileInput"
-    );
-
-const searchBox =
-    document.getElementById(
-        "searchBox"
-    );
-
-const searchText =
-    document.getElementById(
-        "searchText"
-    );
-
-const toast =
-    document.getElementById(
-        "toast"
-    );
-
-const modal =
-    document.getElementById(
-        "modal"
-    );
-
-const modalTitle =
-    document.getElementById(
-        "modalTitle"
-    );
-
-const modalText =
-    document.getElementById(
-        "modalText"
-    );
-
-const reportReason =
-    document.getElementById(
-        "reportReason"
-    );
-
-const cancelModal =
-    document.getElementById(
-        "cancelModal"
-    );
-
-const confirmModal =
-    document.getElementById(
-        "confirmModal"
-    );
-
-
-let modalAction = null;
-
-let searching = false;
-
-
-/* =====================================================
-   TOAST
-===================================================== */
-
-function showToast(text) {
-
-    toast.textContent = text;
-
-    toast.classList.add("show");
-
-    setTimeout(
+    socket.on(
+        "connect",
         () => {
-            toast.classList.remove("show");
-        },
-        2800
-    );
 
-}
+            serverStatus.textContent =
+                "Server online";
 
+            statusDot.style.background =
+                "#4ade80";
 
-/* =====================================================
-   CHAT LEEREN
-===================================================== */
-
-function clearChat() {
-
-    messages.replaceChildren();
-
-    messageInput.value = "";
-
-    emojiPanel.style.display = "none";
-
-    const empty =
-        document.createElement("div");
-
-    empty.id =
-        "emptyMessage";
-
-    empty.className =
-        "empty-message";
-
-    empty.innerHTML = `
-        <div class="empty-icon">
-            💬
-        </div>
-
-        Du kannst jetzt chatten.
-    `;
-
-    messages.appendChild(empty);
-
-}
-
-
-/* =====================================================
-   SUCHANZEIGE
-===================================================== */
-
-function showSearching() {
-
-    messages.replaceChildren();
-
-    const element =
-        document.createElement("div");
-
-    element.className =
-        "empty-message";
-
-    element.innerHTML = `
-        <div class="empty-icon">
-            🔎
-        </div>
-
-        Suche nach einem neuen Partner...
-    `;
-
-    messages.appendChild(element);
-
-}
-
-
-/* =====================================================
-   MODAL
-===================================================== */
-
-function openModal(
-    title,
-    text,
-    action,
-    danger = false,
-    report = false
-) {
-
-    modalTitle.textContent =
-        title;
-
-    modalText.textContent =
-        text;
-
-    modalAction =
-        action;
-
-    reportReason.style.display =
-        report
-            ? "block"
-            : "none";
-
-    confirmModal.className =
-        danger
-            ? "red"
-            : "confirm";
-
-    modal.style.display =
-        "flex";
-
-}
-
-
-function closeModal() {
-
-    modal.style.display =
-        "none";
-
-    modalAction = null;
-
-    reportReason.style.display =
-        "none";
-
-}
-
-
-cancelModal.addEventListener(
-    "click",
-    closeModal
-);
-
-
-confirmModal.addEventListener(
-    "click",
-    () => {
-
-        if (modalAction) {
-
-            modalAction();
+            statusDot.style.boxShadow =
+                "0 0 10px #4ade80";
 
         }
-
-        closeModal();
-
-    }
-);
+    );
 
 
-/* =====================================================
-   PARTNER SUCHEN
-===================================================== */
+    socket.on(
+        "disconnect",
+        () => {
 
-findBtn.addEventListener(
-    "click",
-    () => {
+            serverStatus.textContent =
+                "Server offline";
 
-        if (searching) {
+            statusDot.style.background =
+                "#ef4444";
+
+            statusDot.style.boxShadow =
+                "0 0 10px #ef4444";
+
+            connectedToPartner = false;
+
+        }
+    );
+
+
+    // =========================
+    // ONLINE
+    // =========================
+
+    socket.on(
+        "online users",
+        (count) => {
+
+            onlineUsers.textContent =
+                count;
+
+        }
+    );
+
+
+    // =========================
+    // PARTNER SUCHEN
+    // =========================
+
+    startButton.addEventListener(
+        "click",
+        () => {
+
+            if (isBanned) {
+                return;
+            }
+
+            startButton.disabled = true;
+
+            searching.style.display =
+                "flex";
+
+            startScreen.style.display =
+                "none";
+
+            partnerStatus.textContent =
+                "🔎 Suche Partner...";
+
+            socket.emit(
+                "find partner"
+            );
+
+        }
+    );
+
+
+    // =========================
+    // WARTEN
+    // =========================
+
+    socket.on(
+        "waiting",
+        () => {
+
+            startScreen.style.display =
+                "none";
+
+            searching.style.display =
+                "flex";
+
+        }
+    );
+
+
+    // =========================
+    // PARTNER GEFUNDEN
+    // =========================
+
+    socket.on(
+        "partner found",
+        () => {
+
+            searching.style.display =
+                "none";
+
+            startScreen.style.display =
+                "none";
+
+            startButton.disabled =
+                false;
+
+            connectedToPartner =
+                true;
+
+            partnerStatus.textContent =
+                "🟢 Mit Partner verbunden";
+
+            messages.innerHTML = "";
+
+            messageInput.disabled =
+                false;
+
+            sendButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            reportButton.disabled =
+                false;
+
+            messageInput.focus();
+
+        }
+    );
+
+
+    // =========================
+    // NACHRICHT SENDEN
+    // =========================
+
+    function sendMessage() {
+
+        if (
+            isBanned ||
+            !connectedToPartner
+        ) {
             return;
         }
 
-        searching = true;
 
-        clearChat();
+        const text =
+            messageInput.value.trim();
 
-        findBtn.disabled =
-            true;
 
-        findBtn.style.display =
-            "none";
+        if (!text) {
+            return;
+        }
 
-        searchBox.style.display =
-            "block";
-
-        searchText.textContent =
-            "Warte auf eine andere Person...";
 
         socket.emit(
-            "find partner",
+            "chat message",
             {
-                deviceId
+                text: text
             }
         );
 
-    }
-);
-
-
-/* =====================================================
-   WARTEN
-===================================================== */
-
-socket.on(
-    "waiting",
-    () => {
-
-        searching = true;
-
-        searchText.textContent =
-            "Noch niemand verfügbar. Wir suchen weiter...";
-
-    }
-);
-
-
-/* =====================================================
-   PARTNER GEFUNDEN
-===================================================== */
-
-socket.on(
-    "partner found",
-    () => {
-
-        clearChat();
-
-        searching = false;
-
-        startScreen.style.display =
-            "none";
-
-        chatScreen.style.display =
-            "flex";
-
-        searchBox.style.display =
-            "none";
-
-        status.textContent =
-            "Verbunden";
-
-        messageInput.focus();
-
-        showToast(
-            "🎉 Neuer Partner gefunden!"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   NACHRICHT SENDEN
-===================================================== */
-
-function sendMessage() {
-
-    const text =
-        messageInput.value.trim();
-
-    if (!text) {
-        return;
-    }
-
-    addMessage(
-        text,
-        true
-    );
-
-    socket.emit(
-        "chat message",
-        text
-    );
-
-    messageInput.value = "";
-
-    messageInput.focus();
-
-}
-
-
-sendBtn.addEventListener(
-    "click",
-    sendMessage
-);
-
-
-messageInput.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            event.preventDefault();
-
-            sendMessage();
-
-        }
-
-    }
-);
-
-
-/* =====================================================
-   NACHRICHT EMPFANGEN
-===================================================== */
-
-socket.on(
-    "chat message",
-    message => {
 
         addMessage(
-            message,
-            false
+            text,
+            true,
+            new Date().toLocaleTimeString(
+                "de-DE",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }
+            )
         );
 
-        showToast(
-            "💬 Neue Nachricht"
-        );
 
-    }
-);
+        messageInput.value = "";
 
-
-/* =====================================================
-   NACHRICHT ANZEIGEN
-===================================================== */
-
-function addMessage(
-    text,
-    mine
-) {
-
-    const empty =
-        document.getElementById(
-            "emptyMessage"
-        );
-
-    if (empty) {
-        empty.remove();
     }
 
 
-    const row =
-        document.createElement(
-            "div"
-        );
-
-    row.className =
-        "message-row";
-
-    if (mine) {
-        row.classList.add("mine");
-    }
+    sendButton.addEventListener(
+        "click",
+        sendMessage
+    );
 
 
-    const content =
-        document.createElement(
-            "div"
-        );
+    messageInput.addEventListener(
+        "keydown",
+        (event) => {
 
-    content.className =
-        "message-content";
+            if (
+                event.key === "Enter"
+            ) {
 
+                event.preventDefault();
 
-    const bubble =
-        document.createElement(
-            "div"
-        );
+                sendMessage();
 
-    bubble.className =
-        "message";
-
-    bubble.textContent =
-        text;
-
-
-    const time =
-        document.createElement(
-            "div"
-        );
-
-    time.className =
-        "time";
-
-    time.textContent =
-        new Date().toLocaleTimeString(
-            "de-DE",
-            {
-                hour: "2-digit",
-                minute: "2-digit"
             }
-        );
-
-
-    content.appendChild(
-        bubble
-    );
-
-    content.appendChild(
-        time
-    );
-
-    row.appendChild(
-        content
-    );
-
-    messages.appendChild(
-        row
-    );
-
-    messages.scrollTop =
-        messages.scrollHeight;
-
-}
-
-
-/* =====================================================
-   EMOJIS
-===================================================== */
-
-const emojiCategories = {
-
-    smileys:
-        "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😎 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 🥱 😴 🤗 🤩 🥳 😡 😢 😭 😱 😳 🤯 😈 👻 💀 🤖",
-
-    people:
-        "👋 🤚 🖐️ ✋ 🖖 👌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 👏 🙌 👐 🤝 🙏 💪 👀",
-
-    animals:
-        "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐙 🦄 🐝 🦋 🐢 🐍 🦖 🐳 🐬 🐟 🦈 🦉 🦅",
-
-    food:
-        "🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🍍 🥝 🍕 🍔 🍟 🌭 🌮 🌯 🥪 🍿 🍩 🍪 🎂 🍰 🍫 🍭 🍬 ☕ 🥤",
-
-    objects:
-        "💡 🔥 ⭐ ✨ 🎉 🎁 🎈 ⚽ 🏀 🏐 🎮 🎧 📱 💻 ⌨️ 🖥️ 📷 📚 ✏️ 🔑 🔒 💎 🚗 ✈️ 🚀",
-
-    symbols:
-        "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💯 ❗ ❓ ⚠️ ✅ ❌ ⭕ 🔴 🟢 🔵"
-
-};
-
-
-let currentEmojiCategory =
-    "smileys";
-
-
-function renderEmojis(
-    search = ""
-) {
-
-    emojiGrid.replaceChildren();
-
-    let emojis =
-        emojiCategories[
-            currentEmojiCategory
-        ].split(" ");
-
-
-    if (search.trim()) {
-
-        emojis =
-            emojis.filter(
-                emoji =>
-                    emoji.includes(
-                        search.trim()
-                    )
-            );
-
-    }
-
-
-    emojis.forEach(
-        emoji => {
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "emoji";
-
-            button.textContent =
-                emoji;
-
-            button.type =
-                "button";
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    messageInput.value +=
-                        emoji;
-
-                    messageInput.focus();
-
-                }
-            );
-
-            emojiGrid.appendChild(
-                button
-            );
-
-        }
-    );
-
-}
-
-
-renderEmojis();
-
-
-document
-    .querySelectorAll(
-        ".emoji-category"
-    )
-    .forEach(
-        button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    document
-                        .querySelectorAll(
-                            ".emoji-category"
-                        )
-                        .forEach(
-                            b =>
-                                b.classList.remove(
-                                    "active"
-                                )
-                        );
-
-                    button.classList.add(
-                        "active"
-                    );
-
-                    currentEmojiCategory =
-                        button.dataset.category;
-
-                    emojiSearch.value = "";
-
-                    renderEmojis();
-
-                }
-            );
 
         }
     );
 
 
-emojiSearch.addEventListener(
-    "input",
-    () => {
+    // =========================
+    // NACHRICHT EMPFANGEN
+    // =========================
 
-        renderEmojis(
-            emojiSearch.value
-        );
+    socket.on(
+        "chat message",
+        (data) => {
 
-    }
-);
-
-
-emojiBtn.addEventListener(
-    "click",
-    () => {
-
-        emojiPanel.style.display =
-            emojiPanel.style.display ===
-            "block"
-                ? "none"
-                : "block";
-
-    }
-);
-
-
-/* =====================================================
-   DATEI AUSWÄHLEN
-===================================================== */
-
-fileBtn.addEventListener(
-    "click",
-    () => {
-
-        fileInput.click();
-
-    }
-);
-
-
-fileInput.addEventListener(
-    "change",
-    async () => {
-
-        const file =
-            fileInput.files[0];
-
-        if (!file) {
-            return;
-        }
-
-
-        if (
-            file.size >
-            10 * 1024 * 1024
-        ) {
-
-            showToast(
-                "⚠️ Die Datei ist größer als 10 MB."
-            );
-
-            fileInput.value = "";
-
-            return;
-
-        }
-
-
-        const formData =
-            new FormData();
-
-        formData.append(
-            "file",
-            file
-        );
-
-
-        /*
-         * Der Server verwendet die
-         * Socket-ID für den Upload.
-         */
-        formData.append(
-            "socketId",
-            socket.id
-        );
-
-
-        showToast(
-            "📤 Datei wird hochgeladen..."
-        );
-
-
-        try {
-
-            const response =
-                await fetch(
-                    "/upload",
+            addMessage(
+                data.text || "",
+                false,
+                new Date().toLocaleTimeString(
+                    "de-DE",
                     {
-                        method: "POST",
-                        body: formData
+                        hour: "2-digit",
+                        minute: "2-digit"
                     }
-                );
-
-
-            const data =
-                await response.json();
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    data.error ||
-                    "Upload fehlgeschlagen."
-                );
-
-            }
-
-
-            /*
-             * Datei auch beim Absender anzeigen.
-             */
-            addFileMessage(
-                data.file,
-                true
-            );
-
-
-            showToast(
-                "✅ Datei gesendet."
-            );
-
-
-        } catch (error) {
-
-            console.error(error);
-
-            showToast(
-                "❌ " +
-                error.message
+                )
             );
 
         }
+    );
 
 
-        fileInput.value = "";
+    // =========================
+    // NACHRICHT ANZEIGEN
+    // =========================
 
-    }
-);
+    function addMessage(
+        text,
+        own,
+        time
+    ) {
 
-
-/* =====================================================
-   DATEI EMPFANGEN
-===================================================== */
-
-socket.on(
-    "file received",
-    file => {
-
-        addFileMessage(
-            file,
-            false
-        );
-
-        showToast(
-            "📎 Datei erhalten"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   DATEI ANZEIGEN
-===================================================== */
-
-function addFileMessage(
-    file,
-    mine
-) {
-
-    const empty =
-        document.getElementById(
-            "emptyMessage"
-        );
-
-    if (empty) {
-        empty.remove();
-    }
-
-
-    const row =
-        document.createElement(
-            "div"
-        );
-
-    row.className =
-        "message-row";
-
-    if (mine) {
-        row.classList.add("mine");
-    }
-
-
-    const content =
-        document.createElement(
-            "div"
-        );
-
-    content.className =
-        "message-content";
-
-
-    const message =
-        document.createElement(
-            "div"
-        );
-
-    message.className =
-        "message file-message";
-
-
-    const preview =
-        document.createElement(
-            "div"
-        );
-
-    preview.className =
-        "file-preview blurred";
-
-
-    const isImage =
-        file.type &&
-        file.type.startsWith(
-            "image/"
-        );
-
-
-    if (isImage) {
-
-        const image =
-            document.createElement(
-                "img"
-            );
-
-        image.src =
-            file.url +
-            "?socket=" +
-            encodeURIComponent(
-                socket.id
-            );
-
-        image.alt =
-            "Bild";
-
-        preview.appendChild(
-            image
-        );
-
-    } else {
-
-        const icon =
+        const wrapper =
             document.createElement(
                 "div"
             );
 
-        icon.style.cssText = `
-            height:180px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:65px;
-        `;
 
-        icon.textContent =
-            "📄";
+        wrapper.className =
+            "message " +
+            (
+                own
+                    ? "me"
+                    : "partner"
+            );
 
-        preview.appendChild(
-            icon
+
+        const textElement =
+            document.createElement(
+                "div"
+            );
+
+
+        textElement.textContent =
+            text;
+
+
+        const timeElement =
+            document.createElement(
+                "div"
+            );
+
+
+        timeElement.className =
+            "time";
+
+
+        timeElement.textContent =
+            time;
+
+
+        wrapper.appendChild(
+            textElement
         );
+
+
+        wrapper.appendChild(
+            timeElement
+        );
+
+
+        messages.appendChild(
+            wrapper
+        );
+
+
+        messages.scrollTop =
+            messages.scrollHeight;
 
     }
 
 
-    const overlay =
-        document.createElement(
-            "div"
-        );
+    // =========================
+    // NÄCHSTER PARTNER
+    // =========================
 
-    overlay.className =
-        "file-overlay";
-
-
-    const lock =
-        document.createElement(
-            "div"
-        );
-
-    lock.style.fontSize =
-        "32px";
-
-    lock.textContent =
-        "🔒";
-
-
-    const text =
-        document.createElement(
-            "strong"
-        );
-
-    text.textContent =
-        "Datei verborgen";
-
-
-    const openButton =
-        document.createElement(
-            "button"
-        );
-
-    openButton.className =
-        "open-file-btn";
-
-    openButton.textContent =
-        "👁️ Öffnen";
-
-
-    overlay.appendChild(
-        lock
-    );
-
-    overlay.appendChild(
-        text
-    );
-
-    overlay.appendChild(
-        openButton
-    );
-
-    preview.appendChild(
-        overlay
-    );
-
-
-    openButton.addEventListener(
+    nextButton.addEventListener(
         "click",
         () => {
 
-            preview.classList.remove(
-                "blurred"
-            );
-
-            overlay.remove();
-
-        }
-    );
-
-
-    message.appendChild(
-        preview
-    );
-
-
-    const info =
-        document.createElement(
-            "div"
-        );
-
-    info.className =
-        "file-info";
-
-
-    const fileName =
-        document.createElement(
-            "div"
-        );
-
-    fileName.className =
-        "file-name";
-
-    fileName.textContent =
-        file.name;
-
-
-    const fileSize =
-        document.createElement(
-            "div"
-        );
-
-    fileSize.className =
-        "file-size";
-
-    fileSize.textContent =
-        formatFileSize(
-            file.size
-        );
-
-
-    const actions =
-        document.createElement(
-            "div"
-        );
-
-    actions.className =
-        "file-actions";
-
-
-    const download =
-        document.createElement(
-            "button"
-        );
-
-    download.className =
-        "file-action";
-
-    download.textContent =
-        "⬇️ Herunterladen";
-
-
-    download.addEventListener(
-        "click",
-        () => {
-
-            const url =
-                file.url +
-                "?socket=" +
-                encodeURIComponent(
-                    socket.id
-                );
-
-            const link =
-                document.createElement(
-                    "a"
-                );
-
-            link.href =
-                url;
-
-            link.download =
-                file.name;
-
-            link.target =
-                "_blank";
-
-            document.body.appendChild(
-                link
-            );
-
-            link.click();
-
-            link.remove();
-
-        }
-    );
-
-
-    const deleteButton =
-        document.createElement(
-            "button"
-        );
-
-    deleteButton.className =
-        "file-action delete-file";
-
-    deleteButton.textContent =
-        "🗑️ Für mich löschen";
-
-
-    deleteButton.addEventListener(
-        "click",
-        () => {
-
-            message.replaceChildren();
-
-            const deleted =
-                document.createElement(
-                    "div"
-                );
-
-            deleted.style.color =
-                "#94a3b8";
-
-            deleted.style.fontStyle =
-                "italic";
-
-            deleted.textContent =
-                mine
-                    ? "Du hast diese Datei für dich gelöscht."
-                    : "Der Random hat diese Datei für sich gelöscht.";
-
-            message.appendChild(
-                deleted
-            );
-
-            actions.remove();
-
-        }
-    );
-
-
-    actions.appendChild(
-        download
-    );
-
-    actions.appendChild(
-        deleteButton
-    );
-
-
-    info.appendChild(
-        fileName
-    );
-
-    info.appendChild(
-        fileSize
-    );
-
-    info.appendChild(
-        actions
-    );
-
-
-    message.appendChild(
-        info
-    );
-
-
-    const time =
-        document.createElement(
-            "div"
-        );
-
-    time.className =
-        "time";
-
-    time.textContent =
-        new Date().toLocaleTimeString(
-            "de-DE",
-            {
-                hour: "2-digit",
-                minute: "2-digit"
+            if (isBanned) {
+                return;
             }
-        );
 
 
-    content.appendChild(
-        message
-    );
-
-    content.appendChild(
-        time
-    );
-
-    row.appendChild(
-        content
-    );
-
-    messages.appendChild(
-        row
-    );
-
-    messages.scrollTop =
-        messages.scrollHeight;
-
-}
-
-
-function formatFileSize(
-    bytes
-) {
-
-    if (
-        bytes < 1024
-    ) {
-
-        return bytes +
-            " Bytes";
-
-    }
-
-    if (
-        bytes < 1024 * 1024
-    ) {
-
-        return (
-            bytes / 1024
-        ).toFixed(1) +
-        " KB";
-
-    }
-
-    return (
-        bytes /
-        1024 /
-        1024
-    ).toFixed(1) +
-    " MB";
-
-}
-
-
-/* =====================================================
-   NÄCHSTER PARTNER
-===================================================== */
-
-nextBtn.addEventListener(
-    "click",
-    () => {
-
-        clearChat();
-
-        showSearching();
-
-        messageInput.value = "";
-
-        emojiPanel.style.display =
-            "none";
-
-        status.textContent =
-            "Suche...";
-
-        searching = true;
-
-        socket.emit(
-            "next partner"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   VERLASSEN
-===================================================== */
-
-leaveBtn.addEventListener(
-    "click",
-    () => {
-
-        openModal(
-            "Chat verlassen?",
-            "Deine aktuelle Verbindung wird beendet.",
-            () => {
-
-                clearChat();
-
-                searching = false;
-
-                socket.emit(
-                    "leave chat"
-                );
-
+            if (!connectedToPartner) {
+                return;
             }
-        );
-
-    }
-);
 
 
-/* =====================================================
-   BLOCKIEREN
-===================================================== */
-
-blockBtn.addEventListener(
-    "click",
-    () => {
-
-        openModal(
-            "Partner blockieren?",
-            "Der aktuelle Partner wird blockiert und der Chat beendet.",
-            () => {
-
-                clearChat();
-
-                searching = false;
-
-                socket.emit(
-                    "block partner"
-                );
-
-            },
-            true
-        );
-
-    }
-);
+            socket.emit(
+                "next partner"
+            );
 
 
-/* =====================================================
-   MELDEN
-===================================================== */
+            connectedToPartner =
+                false;
 
-reportBtn.addEventListener(
-    "click",
-    () => {
 
-        openModal(
-            "Partner melden?",
-            "Wähle bitte einen Grund für die Meldung aus.",
-            () => {
+            messageInput.disabled =
+                true;
 
-                const reason =
-                    reportReason.value;
+            sendButton.disabled =
+                true;
 
-                if (!reason) {
+            blockButton.disabled =
+                true;
 
-                    showToast(
-                        "⚠️ Bitte einen Grund auswählen."
+            reportButton.disabled =
+                true;
+
+
+            messages.innerHTML = "";
+
+            partnerStatus.textContent =
+                "🔎 Suche neuen Partner...";
+
+
+            searching.style.display =
+                "flex";
+
+
+            setTimeout(
+                () => {
+
+                    socket.emit(
+                        "find partner"
                     );
 
-                    return;
-
-                }
-
-
-                socket.emit(
-                    "report partner",
-                    reason
-                );
-
-
-                showToast(
-                    "⚠️ Meldung wurde gesendet."
-                );
-
-            },
-            true,
-            true
-        );
-
-    }
-);
-
-
-/* =====================================================
-   CHAT VERLASSEN
-===================================================== */
-
-socket.on(
-    "chat left",
-    () => {
-
-        clearChat();
-
-        searching = false;
-
-        chatScreen.style.display =
-            "none";
-
-        startScreen.style.display =
-            "flex";
-
-        findBtn.style.display =
-            "block";
-
-        findBtn.disabled =
-            false;
-
-        searchBox.style.display =
-            "none";
-
-        showToast(
-            "🚪 Chat verlassen"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   PARTNER VERLÄSST CHAT
-===================================================== */
-
-socket.on(
-    "partner left",
-    () => {
-
-        clearChat();
-
-        searching = false;
-
-        chatScreen.style.display =
-            "none";
-
-        startScreen.style.display =
-            "flex";
-
-        findBtn.style.display =
-            "block";
-
-        findBtn.disabled =
-            false;
-
-        searchBox.style.display =
-            "none";
-
-        showToast(
-            "👋 Dein Partner hat den Chat verlassen."
-        );
-
-    }
-);
-
-
-/* =====================================================
-   FEHLER
-===================================================== */
-
-socket.on(
-    "message error",
-    message => {
-
-        showToast(
-            "⚠️ " + message
-        );
-
-    }
-);
-
-
-/* =====================================================
-   MELDUNG
-===================================================== */
-
-socket.on(
-    "report received",
-    () => {
-
-        showToast(
-            "⚠️ Meldung wurde gespeichert."
-        );
-
-    }
-);
-
-/* =====================================================
-   ONLINE BENUTZER
-===================================================== */
-
-socket.on(
-    "online users",
-    count => {
-
-        const onlineUsers =
-            document.getElementById(
-                "onlineUsers"
+                },
+                200
             );
 
-        if (onlineUsers) {
+        }
+    );
 
-            onlineUsers.textContent =
-                "👥 " +
-                count +
-                (count === 1
-                    ? " Person online"
-                    : " Personen online");
+
+    // =========================
+    // CHAT BEENDET
+    // =========================
+
+    socket.on(
+        "chat ended",
+        (data) => {
+
+            connectedToPartner =
+                false;
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+
+            partnerStatus.textContent =
+                data?.reason ||
+                "Chat beendet.";
+
+        }
+    );
+
+
+    // =========================
+    // BLOCKIEREN
+    // =========================
+
+    blockButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                isBanned ||
+                !connectedToPartner
+            ) {
+                return;
+            }
+
+
+            socket.emit(
+                "block partner"
+            );
+
+        }
+    );
+
+
+    socket.on(
+        "partner blocked",
+        () => {
+
+            connectedToPartner =
+                false;
+
+
+            partnerStatus.textContent =
+                "🚫 Partner wurde blockiert.";
+
+            messages.innerHTML = "";
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+
+            showToast(
+                "🚫 Partner blockiert."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDEN
+    // =========================
+
+    reportButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                isBanned ||
+                !connectedToPartner
+            ) {
+                return;
+            }
+
+
+            const reason =
+                prompt(
+                    "Warum möchtest du diesen Benutzer melden?"
+                );
+
+
+            if (
+                reason === null
+            ) {
+                return;
+            }
+
+
+            const cleanReason =
+                reason.trim();
+
+
+            if (!cleanReason) {
+
+                showToast(
+                    "Bitte einen Grund angeben."
+                );
+
+                return;
+
+            }
+
+
+            socket.emit(
+                "report partner",
+                {
+                    reason:
+                        cleanReason
+                }
+            );
+
+        }
+    );
+
+
+    // =========================
+    // KI PRÜFT MELDUNG
+    // =========================
+
+    socket.on(
+        "report checking",
+        () => {
+
+            reportButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            nextButton.disabled =
+                true;
+
+            partnerStatus.textContent =
+                "🤖 Meldung wird geprüft...";
+
+            showToast(
+                "🤖 Die KI prüft die Meldung..."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG ABGELEHNT
+    // =========================
+
+    socket.on(
+        "report rejected",
+        () => {
+
+            reportButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            partnerStatus.textContent =
+                "🟢 Meldung wurde abgelehnt.";
+
+            showToast(
+                "Die KI hat die Meldung nicht bestätigt."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG FEHLER
+    // =========================
+
+    socket.on(
+        "report error",
+        (data) => {
+
+            reportButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            partnerStatus.textContent =
+                "⚠️ Meldung konnte nicht geprüft werden.";
+
+            showToast(
+                data?.message ||
+                "Fehler bei der Prüfung."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG BESTÄTIGT
+    // =========================
+
+    socket.on(
+        "report saved",
+        () => {
+
+            partnerStatus.textContent =
+                "🚩 Meldung bestätigt.";
+
+            showToast(
+                "🚩 Die Meldung wurde bestätigt."
+            );
+
+        }
+    );
+
+
+    socket.on(
+        "report chat ended",
+        () => {
+
+            connectedToPartner =
+                false;
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+            nextButton.disabled =
+                true;
+
+
+            messages.innerHTML = "";
+
+            partnerStatus.textContent =
+                "Chat beendet.";
+
+        }
+    );
+
+
+    // =========================
+    // GESPERRT
+    // =========================
+
+    socket.on(
+        "user banned",
+        (data) => {
+
+            showBan(data);
+
+        }
+    );
+
+
+    // =========================
+    // BAN ANZEIGEN
+    // =========================
+
+    function showBan(data) {
+
+        isBanned =
+            true;
+
+        connectedToPartner =
+            false;
+
+
+        startScreen.style.display =
+            "none";
+
+        searching.style.display =
+            "none";
+
+
+        messageInput.disabled =
+            true;
+
+        sendButton.disabled =
+            true;
+
+        nextButton.disabled =
+            true;
+
+        reportButton.disabled =
+            true;
+
+        blockButton.disabled =
+            true;
+
+
+        banReason.textContent =
+            data?.reason ||
+            "Verstoß gegen die Chatregeln";
+
+
+        banOverlay.style.display =
+            "flex";
+
+
+        if (banTimer) {
+
+            clearInterval(
+                banTimer
+            );
 
         }
 
-    }
-);
 
-
-/* =====================================================
-   BENUTZER GESPERRT
-===================================================== */
-
-socket.on(
-    "user banned",
-    data => {
-
-        clearChat();
-
-        searching = false;
-
-        chatScreen.style.display =
-            "none";
-
-        startScreen.style.display =
-            "flex";
-
-        findBtn.style.display =
-            "none";
-
-        searchBox.style.display =
-            "none";
-
-
-        const banBox =
-            document.getElementById(
-                "banBox"
-            );
-
-        const banCountdown =
-            document.getElementById(
-                "banCountdown"
+        const remaining =
+            Number(
+                data?.remaining || 0
             );
 
 
-        banBox.style.display =
-            "block";
-
-
-        let remaining =
-            data &&
-            typeof data.remaining === "number"
-                ? data.remaining
-                : 2 * 60 * 60 * 1000;
+        const expiresAt =
+            Number(
+                data?.expiresAt ||
+                Date.now() + remaining
+            );
 
 
         function updateCountdown() {
 
-            if (remaining <= 0) {
+            const left =
+                Math.max(
+                    0,
+                    expiresAt -
+                    Date.now()
+                );
+
+
+            if (left <= 0) {
 
                 clearInterval(
                     banTimer
                 );
 
-                banBox.style.display =
-                    "none";
+                banTimer = null;
 
-                findBtn.style.display =
-                    "block";
-
-                findBtn.disabled =
-                    false;
-
-                showToast(
-                    "✅ Deine Sperre ist abgelaufen."
-                );
+                hideBan();
 
                 return;
+
             }
 
 
             const totalSeconds =
                 Math.ceil(
-                    remaining / 1000
+                    left / 1000
                 );
 
 
@@ -3745,7 +1766,9 @@ socket.on(
 
             const minutes =
                 Math.floor(
-                    (totalSeconds % 3600) / 60
+                    (
+                        totalSeconds % 3600
+                    ) / 60
                 );
 
 
@@ -3754,65 +1777,76 @@ socket.on(
 
 
             banCountdown.textContent =
-                String(hours).padStart(2, "0") +
-                " : " +
-                String(minutes).padStart(2, "0") +
-                " : " +
-                String(seconds).padStart(2, "0");
+                String(hours)
+                    .padStart(2, "0")
+                + ":" +
+                String(minutes)
+                    .padStart(2, "0")
+                + ":" +
+                String(seconds)
+                    .padStart(2, "0");
 
-
-            remaining -= 1000;
         }
 
 
         updateCountdown();
 
 
-        const banTimer =
+        banTimer =
             setInterval(
                 updateCountdown,
                 1000
             );
 
     }
-);
 
-/* =====================================================
-   VERBINDUNG
-===================================================== */
 
-socket.on(
-    "connect",
-    () => {
+    // =========================
+    // BAN ENDE
+    // =========================
 
-        status.textContent =
-            "Verbunden";
+    function hideBan() {
 
-        console.log(
-            "🟢 Socket verbunden:",
-            socket.id
-        );
+        isBanned =
+            false;
+
+
+        banOverlay.style.display =
+            "none";
+
+
+        nextButton.disabled =
+            true;
+
+        reportButton.disabled =
+            true;
+
+        blockButton.disabled =
+            true;
+
+        messageInput.disabled =
+            true;
+
+        sendButton.disabled =
+            true;
+
+
+        partnerStatus.textContent =
+            "Sperre beendet";
+
+
+        startButton.disabled =
+            false;
+
+
+        startScreen.style.display =
+            "flex";
 
     }
-);
 
-
-socket.on(
-    "disconnect",
-    () => {
-
-        status.textContent =
-            "Verbindung getrennt";
-
-        showToast(
-            "🔴 Verbindung zum Server verloren."
-        );
-
-    }
-);
 
 </script>
 
-</body>
 
+</body>
 </html>
