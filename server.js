@@ -1,2126 +1,1852 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const path = require("path");
-const multer = require("multer");
-const fs = require("fs");
-const crypto = require("crypto");
+<!DOCTYPE html>
+<html lang="de">
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-const PORT = process.env.PORT || 3000;
+    <title>Random Chat</title>
 
+    <style>
 
-// =====================================================
-// ORDNER
-// =====================================================
+        * {
+            box-sizing: border-box;
+        }
 
-const publicFolder = __dirname;
-const uploadFolder = path.join(__dirname, "uploads");
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b1220;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-if (!fs.existsSync(uploadFolder)) {
-    fs.mkdirSync(uploadFolder, {
-        recursive: true
-    });
-}
+        /* =========================
+           HEADER
+        ========================= */
 
+        header {
+            height: 70px;
+            background: #111827;
+            border-bottom: 1px solid #263247;
 
-// =====================================================
-// EXPRESS
-// =====================================================
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
 
-app.use(
-    express.json({
-        limit: "1mb"
-    })
-);
+            padding: 0 25px;
+        }
 
-app.use(
-    express.static(publicFolder)
-);
+        .logo {
+            font-size: 22px;
+            font-weight: bold;
+        }
 
+        .online {
+            color: #4ade80;
+            font-size: 14px;
+        }
 
-// =====================================================
-// DATEIUPLOAD
-// =====================================================
+        /* =========================
+           CHAT
+        ========================= */
 
-const storage = multer.diskStorage({
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            height: calc(100vh - 70px);
 
-    destination: (req, file, callback) => {
+            margin: auto;
 
-        callback(
-            null,
-            uploadFolder
-        );
+            display: flex;
+            flex-direction: column;
+        }
 
-    },
+        .partner {
+            padding: 18px;
 
-    filename: (req, file, callback) => {
+            background: #172033;
+            border-bottom: 1px solid #263247;
 
-        const extension =
-            path.extname(
-                file.originalname
-            );
+            font-weight: bold;
+        }
 
-        const randomName =
-            crypto
-                .randomBytes(24)
-                .toString("hex");
+        .messages {
+            flex: 1;
 
-        callback(
-            null,
-            randomName + extension
-        );
+            padding: 20px;
 
-    }
+            overflow-y: auto;
 
-});
+            display: flex;
+            flex-direction: column;
 
+            gap: 10px;
+        }
 
-const upload = multer({
+        .message {
+            max-width: 70%;
 
-    storage: storage,
+            padding: 12px 15px;
 
-    limits: {
+            border-radius: 15px;
 
-        fileSize:
-            10 * 1024 * 1024
+            word-wrap: break-word;
+        }
 
-    }
+        .message.me {
+            align-self: flex-end;
+            background: #2563eb;
+        }
 
-});
+        .message.partner {
+            align-self: flex-start;
+            background: #1f2937;
+        }
 
+        .time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
 
-// =====================================================
-// RANDOM CHAT
-// =====================================================
+        /* =========================
+           INPUT
+        ========================= */
 
-const waitingUsers =
-    new Set();
+        .input-area {
+            padding: 15px;
 
-const activeChats =
-    new Map();
+            background: #111827;
+            border-top: 1px solid #263247;
 
+            display: flex;
+            gap: 10px;
+        }
 
-// =====================================================
-// BENUTZER-ID
-// =====================================================
-//
-// permanentId -> socket.id
-//
-// Eine Browser-ID kann dadurch
-// einem aktuell verbundenen Socket
-// zugeordnet werden.
-//
+        .input-area input {
+            flex: 1;
 
-const onlineUsers =
-    new Map();
+            padding: 14px;
 
+            border: none;
+            outline: none;
 
-// socket.id -> permanentId
+            border-radius: 10px;
 
-const socketUserIds =
-    new Map();
+            background: #1f2937;
+            color: white;
 
+            font-size: 15px;
+        }
 
-// =====================================================
-// BLOCKIERUNGEN
-// =====================================================
-//
-// permanentId -> Set mit permanentIds
-//
-// Dadurch bleibt eine Blockierung
-// auch nach einer neuen Verbindung erhalten.
-//
+        button {
+            border: none;
 
-const blockedUsers =
-    new Map();
+            padding: 12px 18px;
 
+            border-radius: 10px;
 
-// =====================================================
-// MELDUNGEN / SPERREN
-// =====================================================
-//
-// permanentId -> {
-//     until,
-//     reporterIds
-// }
-//
+            cursor: pointer;
 
-const userReports =
-    new Map();
+            font-weight: bold;
+        }
 
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-// =====================================================
-// DATEIEN
-// =====================================================
-//
-// socket.id -> Set(filename)
-//
+        .send {
+            background: #2563eb;
+            color: white;
+        }
 
-const chatFiles =
-    new Map();
+        .next {
+            background: #374151;
+            color: white;
+        }
 
+        .report {
+            background: #dc2626;
+            color: white;
+        }
 
-// fileToken -> Datei-Informationen
+        .block {
+            background: #4b5563;
+            color: white;
+        }
 
-const fileTokens =
-    new Map();
+        /* =========================
+           START SCREEN
+        ========================= */
 
+        .start-screen {
+            position: fixed;
+            inset: 0;
 
-// =====================================================
-// HILFSFUNKTIONEN
-// =====================================================
+            display: flex;
 
-function getPartner(socketId) {
+            justify-content: center;
+            align-items: center;
 
-    return activeChats.get(
-        socketId
-    ) || null;
+            background:
+                radial-gradient(
+                    circle at 50% 40%,
+                    rgba(37, 99, 235, 0.12),
+                    transparent 40%
+                ),
+                #0b1220;
 
-}
+            z-index: 10;
+        }
 
+        .start-box {
+            width: 90%;
+            max-width: 500px;
 
-function getPermanentId(socketId) {
+            padding: 45px 40px;
 
-    return socketUserIds.get(
-        socketId
-    ) || null;
+            text-align: center;
 
-}
+            background: rgba(17, 24, 39, 0.95);
 
+            border: 1px solid #263247;
 
-function isUserBlocked(
-    permanentId,
-    otherPermanentId
-) {
+            border-radius: 24px;
 
-    if (
-        !permanentId ||
-        !otherPermanentId
-    ) {
-        return false;
-    }
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.45),
+                0 0 50px rgba(37, 99, 235, 0.08);
 
+            backdrop-filter: blur(12px);
+        }
 
-    const blocked =
-        blockedUsers.get(
-            permanentId
-        );
+        .start-icon {
+            width: 78px;
+            height: 78px;
 
+            margin: 0 auto 20px;
 
-    if (!blocked) {
-        return false;
-    }
+            display: flex;
+            align-items: center;
+            justify-content: center;
 
+            border-radius: 20px;
 
-    return blocked.has(
-        otherPermanentId
-    );
-
-}
-
-
-function isUserBanned(
-    permanentId
-) {
-
-    if (!permanentId) {
-        return false;
-    }
-
-
-    const report =
-        userReports.get(
-            permanentId
-        );
-
-
-    if (!report) {
-        return false;
-    }
-
-
-    if (
-        Date.now() >=
-        report.until
-    ) {
-
-        userReports.delete(
-            permanentId
-        );
-
-        return false;
-
-    }
-
-
-    return true;
-
-}
-
-
-function getBanRemaining(
-    permanentId
-) {
-
-    const report =
-        userReports.get(
-            permanentId
-        );
-
-
-    if (!report) {
-        return 0;
-    }
-
-
-    return Math.max(
-        0,
-        report.until -
-        Date.now()
-    );
-
-}
-
-
-// =====================================================
-// PARTNER SUCHEN
-// =====================================================
-
-function findRandomPartner(
-    socket
-) {
-
-    const permanentId =
-        getPermanentId(
-            socket.id
-        );
-
-
-    const available = [
-        ...waitingUsers
-    ].filter(
-        id => {
-
-            if (
-                id ===
-                socket.id
-            ) {
-                return false;
-            }
-
-
-            const otherSocket =
-                io.sockets.sockets.get(
-                    id
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #3b82f6
                 );
 
+            font-size: 42px;
 
-            if (!otherSocket) {
-                return false;
-            }
+            box-shadow:
+                0 10px 30px
+                rgba(37, 99, 235, 0.35);
+        }
 
+        .start-box h1 {
+            margin: 0;
 
-            const otherPermanentId =
-                getPermanentId(
-                    id
+            font-size: 38px;
+            font-weight: 800;
+
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+
+            color: #93c5fd;
+
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .server-status {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            margin-top: 18px;
+
+            padding: 7px 13px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(74, 222, 128, 0.08);
+
+            border:
+                1px solid
+                rgba(74, 222, 128, 0.18);
+
+            color: #4ade80;
+
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #4ade80;
+
+            box-shadow:
+                0 0 10px #4ade80;
+        }
+
+        .start-description {
+            margin: 25px 0 0;
+
+            color: #aeb8c9;
+
+            font-size: 15px;
+
+            line-height: 1.6;
+        }
+
+        .start-button {
+            width: 100%;
+
+            margin-top: 28px;
+
+            padding: 17px 20px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            gap: 10px;
+
+            border: none;
+            border-radius: 13px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #3b82f6
                 );
 
+            color: white;
 
-            if (
-                !otherPermanentId
-            ) {
-                return false;
+            font-size: 17px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            box-shadow:
+                0 10px 25px
+                rgba(37, 99, 235, 0.25);
+        }
+
+        .button-arrow {
+            font-size: 21px;
+        }
+
+        .features {
+            display: flex;
+
+            justify-content: center;
+
+            gap: 22px;
+
+            margin-top: 25px;
+
+            padding-top: 22px;
+
+            border-top: 1px solid #263247;
+        }
+
+        .feature {
+            display: flex;
+
+            align-items: center;
+
+            gap: 6px;
+
+            color: #8994a8;
+
+            font-size: 12px;
+        }
+
+        .feature span:first-child {
+            color: #60a5fa;
+            font-size: 14px;
+        }
+
+        /* =========================
+           SUCHEN
+        ========================= */
+
+        .searching {
+            display: none;
+
+            position: fixed;
+
+            inset: 0;
+
+            background: #0b1220;
+
+            justify-content: center;
+            align-items: center;
+
+            z-index: 20;
+        }
+
+        .search-box {
+            text-align: center;
+        }
+
+        .loader {
+            width: 45px;
+            height: 45px;
+
+            border: 4px solid #374151;
+
+            border-top-color: #2563eb;
+
+            border-radius: 50%;
+
+            animation:
+                spin 1s linear infinite;
+
+            margin:
+                0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* =========================
+           BAN
+        ========================= */
+
+        #banOverlay {
+            position: fixed;
+
+            inset: 0;
+
+            background:
+                rgba(0, 0, 0, 0.85);
+
+            display: none;
+
+            justify-content: center;
+            align-items: center;
+
+            z-index: 99999;
+        }
+
+        #banBox {
+            width: 90%;
+            max-width: 430px;
+
+            background: #050505;
+
+            color: white;
+
+            border: 1px solid #333;
+
+            border-radius: 18px;
+
+            padding: 35px 30px;
+
+            text-align: center;
+
+            box-shadow:
+                0 20px 70px
+                rgba(0, 0, 0, 0.8);
+        }
+
+        .ban-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        #banBox h2 {
+            margin: 10px 0 20px;
+            font-size: 26px;
+        }
+
+        .ban-text {
+            color: #aaa;
+            line-height: 1.5;
+        }
+
+        .reason {
+            margin-top: 20px;
+
+            background: #111;
+
+            border-radius: 10px;
+
+            padding: 14px;
+        }
+
+        .reason-title {
+            color: #777;
+
+            font-size: 12px;
+
+            text-transform: uppercase;
+
+            margin-bottom: 5px;
+        }
+
+        #banReason {
+            color: #fff;
+            word-break: break-word;
+        }
+
+        .countdown {
+            margin-top: 25px;
+
+            font-size: 42px;
+
+            font-weight: bold;
+
+            color: #ff4444;
+
+            font-variant-numeric:
+                tabular-nums;
+        }
+
+        .remaining {
+            color: #777;
+
+            font-size: 13px;
+
+            margin-top: 5px;
+        }
+
+        /* =========================
+           TOAST
+        ========================= */
+
+        #toast {
+            position: fixed;
+
+            left: 50%;
+            bottom: 25px;
+
+            transform: translateX(-50%);
+
+            background: #111827;
+
+            border: 1px solid #374151;
+
+            color: white;
+
+            padding: 12px 18px;
+
+            border-radius: 10px;
+
+            display: none;
+
+            z-index: 100000;
+
+            box-shadow:
+                0 10px 30px
+                rgba(0,0,0,0.4);
+        }
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 650px) {
+
+            header {
+                padding: 0 15px;
             }
 
-
-            // Gesperrte Personen
-            if (
-                isUserBanned(
-                    otherPermanentId
-                )
-            ) {
-
-                return false;
-
+            .message {
+                max-width: 85%;
             }
 
-
-            if (
-                isUserBanned(
-                    permanentId
-                )
-            ) {
-
-                return false;
-
+            .features {
+                gap: 12px;
             }
 
-
-            // Blockierung prüfen
-            if (
-                isUserBlocked(
-                    permanentId,
-                    otherPermanentId
-                )
-            ) {
-
-                return false;
-
+            .input-area {
+                padding: 10px;
             }
 
+            .input-area button {
+                padding: 10px 12px;
+            }
+        }
 
-            if (
-                isUserBlocked(
-                    otherPermanentId,
-                    permanentId
-                )
-            ) {
+        @media (max-width: 600px) {
 
-                return false;
-
+            .start-box {
+                padding: 35px 22px;
+                border-radius: 20px;
             }
 
+            .start-box h1 {
+                font-size: 31px;
+            }
 
-            return true;
+            .start-icon {
+                width: 65px;
+                height: 65px;
+
+                font-size: 34px;
+            }
+
+            .feature {
+                font-size: 11px;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        🎲 Random Chat
+    </div>
+
+    <div class="online">
+
+        <span id="headerStatusDot">
+            🟢
+        </span>
+
+        <span id="onlineUsers">
+            0
+        </span>
+
+        online
+
+    </div>
+
+</header>
+
+
+<!-- =========================
+     CHAT
+========================= -->
+
+<div class="chat-container">
+
+    <div
+        class="partner"
+        id="partnerStatus"
+    >
+        Kein Partner
+    </div>
+
+
+    <div
+        class="messages"
+        id="messages"
+    ></div>
+
+
+    <div class="input-area">
+
+        <input
+            id="messageInput"
+            type="text"
+            placeholder="Nachricht schreiben..."
+            autocomplete="off"
+            disabled
+        >
+
+        <button
+            class="send"
+            id="sendButton"
+            disabled
+        >
+            Senden
+        </button>
+
+    </div>
+
+
+    <div
+        class="input-area"
+        style="padding-top: 0;"
+    >
+
+        <button
+            class="next"
+            id="nextButton"
+            disabled
+        >
+            Nächster
+        </button>
+
+        <button
+            class="block"
+            id="blockButton"
+            disabled
+        >
+            🚫 Blockieren
+        </button>
+
+        <button
+            class="report"
+            id="reportButton"
+            disabled
+        >
+            🚩 Melden
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     START
+========================= -->
+
+<div
+    class="start-screen"
+    id="startScreen"
+>
+
+    <div class="start-box">
+
+        <div class="start-icon">
+            🎲
+        </div>
+
+
+        <h1>
+            Random Chat
+        </h1>
+
+
+        <div class="subtitle">
+            Partner-Suche
+        </div>
+
+
+        <div class="server-status">
+
+            <span class="status-dot"></span>
+
+            <span id="serverStatus">
+                Server online
+            </span>
+
+        </div>
+
+
+        <p class="start-description">
+            Chatte anonym mit einer zufälligen Person.
+        </p>
+
+
+        <button
+            class="start-button"
+            id="startButton"
+        >
+
+            <span>
+                Partner suchen
+            </span>
+
+            <span class="button-arrow">
+                →
+            </span>
+
+        </button>
+
+
+        <div class="features">
+
+            <div class="feature">
+                <span>⚡</span>
+                <span>Schnell</span>
+            </div>
+
+            <div class="feature">
+                <span>1:1</span>
+                <span>1 zu 1</span>
+            </div>
+
+            <div class="feature">
+                <span>✓</span>
+                <span>Keine Anmeldung</span>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     SUCHEN
+========================= -->
+
+<div
+    class="searching"
+    id="searching"
+>
+
+    <div class="search-box">
+
+        <div class="loader"></div>
+
+        <h2>
+            Partner wird gesucht...
+        </h2>
+
+        <p>
+            Einen Moment bitte.
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     BAN
+========================= -->
+
+<div id="banOverlay">
+
+    <div id="banBox">
+
+        <div class="ban-icon">
+            🔒
+        </div>
+
+        <h2>
+            Du bist gesperrt
+        </h2>
+
+        <div class="ban-text">
+            Du kannst den Chat momentan nicht benutzen.
+        </div>
+
+        <div class="reason">
+
+            <div class="reason-title">
+                Grund
+            </div>
+
+            <div id="banReason">
+                Verstoß gegen die Chatregeln
+            </div>
+
+        </div>
+
+        <div
+            class="countdown"
+            id="banCountdown"
+        >
+            02:00:00
+        </div>
+
+        <div class="remaining">
+            verbleibende Sperrzeit
+        </div>
+
+    </div>
+
+</div>
+
+
+<div id="toast"></div>
+
+
+<!-- =========================
+     SOCKET.IO
+========================= -->
+
+<script src="/socket.io/socket.io.js"></script>
+
+
+<script>
+
+    const socket = io();
+
+
+    // =========================
+    // ELEMENTE
+    // =========================
+
+    const startScreen =
+        document.getElementById("startScreen");
+
+    const startButton =
+        document.getElementById("startButton");
+
+    const searching =
+        document.getElementById("searching");
+
+    const messages =
+        document.getElementById("messages");
+
+    const messageInput =
+        document.getElementById("messageInput");
+
+    const sendButton =
+        document.getElementById("sendButton");
+
+    const nextButton =
+        document.getElementById("nextButton");
+
+    const reportButton =
+        document.getElementById("reportButton");
+
+    const blockButton =
+        document.getElementById("blockButton");
+
+    const partnerStatus =
+        document.getElementById("partnerStatus");
+
+    const onlineUsers =
+        document.getElementById("onlineUsers");
+
+    const banOverlay =
+        document.getElementById("banOverlay");
+
+    const banReason =
+        document.getElementById("banReason");
+
+    const banCountdown =
+        document.getElementById("banCountdown");
+
+    const serverStatus =
+        document.getElementById("serverStatus");
+
+    const statusDot =
+        document.querySelector(".status-dot");
+
+    const toast =
+        document.getElementById("toast");
+
+
+    // =========================
+    // VARIABLEN
+    // =========================
+
+    let isBanned = false;
+
+    let banTimer = null;
+
+    let connectedToPartner = false;
+
+
+    // =========================
+    // TOAST
+    // =========================
+
+    function showToast(text) {
+
+        toast.textContent = text;
+
+        toast.style.display = "block";
+
+
+        setTimeout(() => {
+
+            toast.style.display = "none";
+
+        }, 3000);
+
+    }
+
+
+    // =========================
+    // SERVER VERBINDUNG
+    // =========================
+
+    socket.on(
+        "connect",
+        () => {
+
+            serverStatus.textContent =
+                "Server online";
+
+            statusDot.style.background =
+                "#4ade80";
+
+            statusDot.style.boxShadow =
+                "0 0 10px #4ade80";
 
         }
     );
 
 
-    if (
-        available.length ===
-        0
-    ) {
+    socket.on(
+        "disconnect",
+        () => {
 
-        return null;
+            serverStatus.textContent =
+                "Server offline";
 
-    }
+            statusDot.style.background =
+                "#ef4444";
 
+            statusDot.style.boxShadow =
+                "0 0 10px #ef4444";
 
-    const randomIndex =
-        Math.floor(
-            Math.random() *
-            available.length
-        );
+            connectedToPartner = false;
 
-
-    return available[
-        randomIndex
-    ];
-
-}
+        }
+    );
 
 
-// =====================================================
-// CHAT-DATEIEN LÖSCHEN
-// =====================================================
+    // =========================
+    // ONLINE
+    // =========================
 
-function deleteChatFiles(
-    socketId
-) {
+    socket.on(
+        "online users",
+        (count) => {
 
-    const files =
-        chatFiles.get(
-            socketId
-        );
+            onlineUsers.textContent =
+                count;
 
-
-    if (!files) {
-        return;
-    }
+        }
+    );
 
 
-    for (
-        const filename
-        of files
-    ) {
+    // =========================
+    // PARTNER SUCHEN
+    // =========================
 
-        const filePath =
-            path.join(
-                uploadFolder,
-                filename
-            );
+    startButton.addEventListener(
+        "click",
+        () => {
 
-
-        try {
-
-            if (
-                fs.existsSync(
-                    filePath
-                )
-            ) {
-
-                fs.unlinkSync(
-                    filePath
-                );
-
+            if (isBanned) {
+                return;
             }
 
-        } catch (
-            error
+            startButton.disabled = true;
+
+            searching.style.display =
+                "flex";
+
+            startScreen.style.display =
+                "none";
+
+            partnerStatus.textContent =
+                "🔎 Suche Partner...";
+
+            socket.emit(
+                "find partner"
+            );
+
+        }
+    );
+
+
+    // =========================
+    // WARTEN
+    // =========================
+
+    socket.on(
+        "waiting",
+        () => {
+
+            startScreen.style.display =
+                "none";
+
+            searching.style.display =
+                "flex";
+
+        }
+    );
+
+
+    // =========================
+    // PARTNER GEFUNDEN
+    // =========================
+
+    socket.on(
+        "partner found",
+        () => {
+
+            searching.style.display =
+                "none";
+
+            startScreen.style.display =
+                "none";
+
+            startButton.disabled =
+                false;
+
+            connectedToPartner =
+                true;
+
+            partnerStatus.textContent =
+                "🟢 Mit Partner verbunden";
+
+            messages.innerHTML = "";
+
+            messageInput.disabled =
+                false;
+
+            sendButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            reportButton.disabled =
+                false;
+
+            messageInput.focus();
+
+        }
+    );
+
+
+    // =========================
+    // NACHRICHT SENDEN
+    // =========================
+
+    function sendMessage() {
+
+        if (
+            isBanned ||
+            !connectedToPartner
         ) {
-
-            console.error(
-                "Fehler beim Löschen:",
-                error
-            );
-
+            return;
         }
 
 
-        // Alle Tokens dieser Datei löschen
-        for (
-            const [
-                token,
-                info
-            ]
-            of fileTokens
-        ) {
+        const text =
+            messageInput.value.trim();
+
+
+        if (!text) {
+            return;
+        }
+
+
+        socket.emit(
+            "chat message",
+            {
+                text: text
+            }
+        );
+
+
+        addMessage(
+            text,
+            true,
+            new Date().toLocaleTimeString(
+                "de-DE",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }
+            )
+        );
+
+
+        messageInput.value = "";
+
+    }
+
+
+    sendButton.addEventListener(
+        "click",
+        sendMessage
+    );
+
+
+    messageInput.addEventListener(
+        "keydown",
+        (event) => {
 
             if (
-                info.filename ===
-                filename
+                event.key === "Enter"
             ) {
 
-                fileTokens.delete(
-                    token
-                );
+                event.preventDefault();
+
+                sendMessage();
 
             }
 
         }
-
-    }
-
-
-    chatFiles.delete(
-        socketId
-    );
-
-}
-
-
-// =====================================================
-// CHAT VERLASSEN
-// =====================================================
-
-function leaveChat(
-    socket
-) {
-
-    const partnerId =
-        activeChats.get(
-            socket.id
-        );
-
-
-    if (!partnerId) {
-        return;
-    }
-
-
-    activeChats.delete(
-        socket.id
-    );
-
-    activeChats.delete(
-        partnerId
     );
 
 
-    deleteChatFiles(
-        socket.id
+    // =========================
+    // NACHRICHT EMPFANGEN
+    // =========================
+
+    socket.on(
+        "chat message",
+        (data) => {
+
+            addMessage(
+                data.text || "",
+                false,
+                new Date().toLocaleTimeString(
+                    "de-DE",
+                    {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    }
+                )
+            );
+
+        }
     );
 
-    deleteChatFiles(
-        partnerId
-    );
 
+    // =========================
+    // NACHRICHT ANZEIGEN
+    // =========================
 
-    const partnerSocket =
-        io.sockets.sockets.get(
-            partnerId
-        );
-
-
-    if (
-        partnerSocket
+    function addMessage(
+        text,
+        own,
+        time
     ) {
 
-        partnerSocket.emit(
-            "partner left"
+        const wrapper =
+            document.createElement(
+                "div"
+            );
+
+
+        wrapper.className =
+            "message " +
+            (
+                own
+                    ? "me"
+                    : "partner"
+            );
+
+
+        const textElement =
+            document.createElement(
+                "div"
+            );
+
+
+        textElement.textContent =
+            text;
+
+
+        const timeElement =
+            document.createElement(
+                "div"
+            );
+
+
+        timeElement.className =
+            "time";
+
+
+        timeElement.textContent =
+            time;
+
+
+        wrapper.appendChild(
+            textElement
         );
+
+
+        wrapper.appendChild(
+            timeElement
+        );
+
+
+        messages.appendChild(
+            wrapper
+        );
+
+
+        messages.scrollTop =
+            messages.scrollHeight;
 
     }
 
-}
+
+    // =========================
+    // NÄCHSTER PARTNER
+    // =========================
+
+    nextButton.addEventListener(
+        "click",
+        () => {
+
+            if (isBanned) {
+                return;
+            }
 
 
-// =====================================================
-// NEUEN PARTNER SUCHEN
-// =====================================================
+            if (!connectedToPartner) {
+                return;
+            }
 
-function findNewPartner(
-    socket
-) {
 
-    waitingUsers.delete(
-        socket.id
+            socket.emit(
+                "next partner"
+            );
+
+
+            connectedToPartner =
+                false;
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+
+            messages.innerHTML = "";
+
+            partnerStatus.textContent =
+                "🔎 Suche neuen Partner...";
+
+
+            searching.style.display =
+                "flex";
+
+
+            setTimeout(
+                () => {
+
+                    socket.emit(
+                        "find partner"
+                    );
+
+                },
+                200
+            );
+
+        }
     );
 
 
-    const permanentId =
-        getPermanentId(
-            socket.id
-        );
+    // =========================
+    // CHAT BEENDET
+    // =========================
+
+    socket.on(
+        "chat ended",
+        (data) => {
+
+            connectedToPartner =
+                false;
 
 
-    // Ist der Benutzer gesperrt?
-    if (
-        isUserBanned(
-            permanentId
-        )
-    ) {
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+
+            partnerStatus.textContent =
+                data?.reason ||
+                "Chat beendet.";
+
+        }
+    );
+
+
+    // =========================
+    // BLOCKIEREN
+    // =========================
+
+    blockButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                isBanned ||
+                !connectedToPartner
+            ) {
+                return;
+            }
+
+
+            socket.emit(
+                "block partner"
+            );
+
+        }
+    );
+
+
+    socket.on(
+        "partner blocked",
+        () => {
+
+            connectedToPartner =
+                false;
+
+
+            partnerStatus.textContent =
+                "🚫 Partner wurde blockiert.";
+
+            messages.innerHTML = "";
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+
+            showToast(
+                "🚫 Partner blockiert."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDEN
+    // =========================
+
+    reportButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                isBanned ||
+                !connectedToPartner
+            ) {
+                return;
+            }
+
+
+            const reason =
+                prompt(
+                    "Warum möchtest du diesen Benutzer melden?"
+                );
+
+
+            if (
+                reason === null
+            ) {
+                return;
+            }
+
+
+            const cleanReason =
+                reason.trim();
+
+
+            if (!cleanReason) {
+
+                showToast(
+                    "Bitte einen Grund angeben."
+                );
+
+                return;
+
+            }
+
+
+            socket.emit(
+                "report partner",
+                {
+                    reason:
+                        cleanReason
+                }
+            );
+
+        }
+    );
+
+
+    // =========================
+    // KI PRÜFT MELDUNG
+    // =========================
+
+    socket.on(
+        "report checking",
+        () => {
+
+            reportButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            nextButton.disabled =
+                true;
+
+            partnerStatus.textContent =
+                "🤖 Meldung wird geprüft...";
+
+            showToast(
+                "🤖 Die KI prüft die Meldung..."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG ABGELEHNT
+    // =========================
+
+    socket.on(
+        "report rejected",
+        () => {
+
+            reportButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            partnerStatus.textContent =
+                "🟢 Meldung wurde abgelehnt.";
+
+            showToast(
+                "Die KI hat die Meldung nicht bestätigt."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG FEHLER
+    // =========================
+
+    socket.on(
+        "report error",
+        (data) => {
+
+            reportButton.disabled =
+                false;
+
+            blockButton.disabled =
+                false;
+
+            nextButton.disabled =
+                false;
+
+            partnerStatus.textContent =
+                "⚠️ Meldung konnte nicht geprüft werden.";
+
+            showToast(
+                data?.message ||
+                "Fehler bei der Prüfung."
+            );
+
+        }
+    );
+
+
+    // =========================
+    // MELDUNG BESTÄTIGT
+    // =========================
+
+    socket.on(
+        "report saved",
+        () => {
+
+            partnerStatus.textContent =
+                "🚩 Meldung bestätigt.";
+
+            showToast(
+                "🚩 Die Meldung wurde bestätigt."
+            );
+
+        }
+    );
+
+
+    socket.on(
+        "report chat ended",
+        () => {
+
+            connectedToPartner =
+                false;
+
+
+            messageInput.disabled =
+                true;
+
+            sendButton.disabled =
+                true;
+
+            blockButton.disabled =
+                true;
+
+            reportButton.disabled =
+                true;
+
+            nextButton.disabled =
+                true;
+
+
+            messages.innerHTML = "";
+
+            partnerStatus.textContent =
+                "Chat beendet.";
+
+        }
+    );
+
+
+    // =========================
+    // GESPERRT
+    // =========================
+
+    socket.on(
+        "user banned",
+        (data) => {
+
+            showBan(data);
+
+        }
+    );
+
+
+    // =========================
+    // BAN ANZEIGEN
+    // =========================
+
+    function showBan(data) {
+
+        isBanned =
+            true;
+
+        connectedToPartner =
+            false;
+
+
+        startScreen.style.display =
+            "none";
+
+        searching.style.display =
+            "none";
+
+
+        messageInput.disabled =
+            true;
+
+        sendButton.disabled =
+            true;
+
+        nextButton.disabled =
+            true;
+
+        reportButton.disabled =
+            true;
+
+        blockButton.disabled =
+            true;
+
+
+        banReason.textContent =
+            data?.reason ||
+            "Verstoß gegen die Chatregeln";
+
+
+        banOverlay.style.display =
+            "flex";
+
+
+        if (banTimer) {
+
+            clearInterval(
+                banTimer
+            );
+
+        }
+
 
         const remaining =
-            getBanRemaining(
-                permanentId
+            Number(
+                data?.remaining || 0
             );
 
 
-        socket.emit(
-            "user banned",
-            {
-                remaining:
-                    remaining
-            }
-        );
+        const expiresAt =
+            Number(
+                data?.expiresAt ||
+                Date.now() + remaining
+            );
 
 
-        return;
+        function updateCountdown() {
 
-    }
-
-
-    const partnerId =
-        findRandomPartner(
-            socket
-        );
-
-
-    if (!partnerId) {
-
-        waitingUsers.add(
-            socket.id
-        );
-
-
-        socket.emit(
-            "waiting"
-        );
-
-
-        return;
-
-    }
-
-
-    waitingUsers.delete(
-        partnerId
-    );
-
-
-    activeChats.set(
-        socket.id,
-        partnerId
-    );
-
-    activeChats.set(
-        partnerId,
-        socket.id
-    );
-
-
-    chatFiles.set(
-        socket.id,
-        new Set()
-    );
-
-    chatFiles.set(
-        partnerId,
-        new Set()
-    );
-
-
-    socket.emit(
-        "partner found"
-    );
-
-
-    io.to(
-        partnerId
-    ).emit(
-        "partner found"
-    );
-
-
-    console.log(
-        `🎲 Random Chat: ${socket.id} ↔ ${partnerId}`
-    );
-
-}
-
-
-// =====================================================
-// SOCKET.IO
-// =====================================================
-
-io.on(
-    "connection",
-    socket => {
-
-        console.log(
-            "🟢 Neue Person:",
-            socket.id
-        );
-
-        /* =====================================================
-   ONLINE BENUTZER
-===================================================== */
-
-io.emit(
-    "online users",
-    io.engine.clientsCount
-);
-
-        // -------------------------------------------------
-        // BENUTZER-ID REGISTRIEREN
-        // -------------------------------------------------
-
-        socket.on(
-            "register user",
-            permanentId => {
-
-                if (
-                    typeof permanentId !==
-                    "string"
-                ) {
-                    return;
-                }
-
-
-                permanentId =
-                    permanentId.trim();
-
-
-                if (
-                    permanentId.length <
-                    10 ||
-                    permanentId.length >
-                    200
-                ) {
-
-                    return;
-
-                }
-
-
-                // Alte Verbindung derselben ID
-                const oldSocketId =
-                    onlineUsers.get(
-                        permanentId
-                    );
-
-
-                if (
-                    oldSocketId &&
-                    oldSocketId !==
-                    socket.id
-                ) {
-
-                    const oldSocket =
-                        io.sockets.sockets.get(
-                            oldSocketId
-                        );
-
-
-                    if (
-                        oldSocket
-                    ) {
-
-                        oldSocket.emit(
-                            "duplicate connection"
-                        );
-
-                    }
-
-                }
-
-
-                onlineUsers.set(
-                    permanentId,
-                    socket.id
+            const left =
+                Math.max(
+                    0,
+                    expiresAt -
+                    Date.now()
                 );
 
 
-                socketUserIds.set(
-                    socket.id,
-                    permanentId
+            if (left <= 0) {
+
+                clearInterval(
+                    banTimer
                 );
 
+                banTimer = null;
 
-                if (
-                    !blockedUsers.has(
-                        permanentId
-                    )
-                ) {
+                hideBan();
 
-                    blockedUsers.set(
-                        permanentId,
-                        new Set()
-                    );
-
-                }
-
-
-                console.log(
-                    `🆔 Benutzer-ID: ${permanentId}`
-                );
-
-
-                // Prüfen, ob gesperrt
-                if (
-                    isUserBanned(
-                        permanentId
-                    )
-                ) {
-
-                    socket.emit(
-                        "user banned",
-                        {
-                            remaining:
-                                getBanRemaining(
-                                    permanentId
-                                )
-                        }
-                    );
-
-                }
+                return;
 
             }
-        );
 
 
-        // -------------------------------------------------
-        // PARTNER SUCHEN
-        // -------------------------------------------------
-
-        socket.on(
-            "find partner",
-            () => {
-
-                waitingUsers.delete(
-                    socket.id
+            const totalSeconds =
+                Math.ceil(
+                    left / 1000
                 );
 
 
-                leaveChat(
-                    socket
+            const hours =
+                Math.floor(
+                    totalSeconds / 3600
                 );
 
 
-                findNewPartner(
-                    socket
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // NACHRICHT
-        // -------------------------------------------------
-
-        socket.on(
-            "chat message",
-            message => {
-
-                const partnerId =
-                    activeChats.get(
-                        socket.id
-                    );
-
-
-                if (!partnerId) {
-                    return;
-                }
-
-
-                if (
-                    typeof message !==
-                    "string"
-                ) {
-
-                    return;
-
-                }
-
-
-                const cleanMessage =
-                    message.trim();
-
-
-                if (
-                    !cleanMessage
-                ) {
-
-                    return;
-
-                }
-
-
-                if (
-                    cleanMessage.length >
-                    2000
-                ) {
-
-                    socket.emit(
-                        "message error",
-                        "Die Nachricht ist zu lang."
-                    );
-
-
-                    return;
-
-                }
-
-
-                io.to(
-                    partnerId
-                ).emit(
-                    "chat message",
-                    cleanMessage
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // NÄCHSTER PARTNER
-        // -------------------------------------------------
-
-        socket.on(
-            "next partner",
-            () => {
-
-                const partnerId =
-                    activeChats.get(
-                        socket.id
-                    );
-
-
-                if (
-                    partnerId
-                ) {
-
-                    activeChats.delete(
-                        socket.id
-                    );
-
-                    activeChats.delete(
-                        partnerId
-                    );
-
-
-                    deleteChatFiles(
-                        socket.id
-                    );
-
-                    deleteChatFiles(
-                        partnerId
-                    );
-
-
-                    const partnerSocket =
-                        io.sockets.sockets.get(
-                            partnerId
-                        );
-
-
-                    if (
-                        partnerSocket
-                    ) {
-
-                        partnerSocket.emit(
-                            "partner left"
-                        );
-
-                    }
-
-                }
-
-
-                findNewPartner(
-                    socket
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // CHAT VERLASSEN
-        // -------------------------------------------------
-
-        socket.on(
-            "leave chat",
-            () => {
-
-                waitingUsers.delete(
-                    socket.id
-                );
-
-
-                leaveChat(
-                    socket
-                );
-
-
-                socket.emit(
-                    "chat left"
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // BLOCKIEREN
-        // -------------------------------------------------
-
-        socket.on(
-            "block partner",
-            () => {
-
-                const partnerId =
-                    activeChats.get(
-                        socket.id
-                    );
-
-
-                if (!partnerId) {
-
-                    socket.emit(
-                        "chat left"
-                    );
-
-                    return;
-
-                }
-
-
-                const myId =
-                    getPermanentId(
-                        socket.id
-                    );
-
-
-                const partnerPermanentId =
-                    getPermanentId(
-                        partnerId
-                    );
-
-
-                if (
-                    myId &&
-                    partnerPermanentId
-                ) {
-
-                    if (
-                        !blockedUsers.has(
-                            myId
-                        )
-                    ) {
-
-                        blockedUsers.set(
-                            myId,
-                            new Set()
-                        );
-
-                    }
-
-
-                    blockedUsers
-                        .get(myId)
-                        .add(
-                            partnerPermanentId
-                        );
-
-                }
-
-
-                activeChats.delete(
-                    socket.id
-                );
-
-                activeChats.delete(
-                    partnerId
-                );
-
-
-                deleteChatFiles(
-                    socket.id
-                );
-
-                deleteChatFiles(
-                    partnerId
-                );
-
-
-                const partnerSocket =
-                    io.sockets.sockets.get(
-                        partnerId
-                    );
-
-
-                if (
-                    partnerSocket
-                ) {
-
-                    partnerSocket.emit(
-                        "partner blocked"
-                    );
-
-                }
-
-
-                socket.emit(
-                    "chat left"
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // MELDEN
-        // -------------------------------------------------
-
-        socket.on(
-            "report partner",
-            data => {
-
-                const partnerId =
-                    activeChats.get(
-                        socket.id
-                    );
-
-
-                if (!partnerId) {
-                    return;
-                }
-
-
-                const reporterId =
-                    getPermanentId(
-                        socket.id
-                    );
-
-
-                const reportedId =
-                    getPermanentId(
-                        partnerId
-                    );
-
-
-                if (
-                    !reporterId ||
-                    !reportedId
-                ) {
-
-                    return;
-
-                }
-
-
-                let reason =
-                    "Nicht angegeben";
-
-                let description =
-                    "";
-
-
-                if (
-                    typeof data ===
-                    "string"
-                ) {
-
-                    reason =
-                        data.trim();
-
-                } else if (
-                    data &&
-                    typeof data ===
-                    "object"
-                ) {
-
-                    if (
-                        typeof data.reason ===
-                        "string"
-                    ) {
-
-                        reason =
-                            data.reason.trim();
-
-                    }
-
-
-                    if (
-                        typeof data.description ===
-                        "string"
-                    ) {
-
-                        description =
-                            data.description.trim();
-
-                    }
-
-                }
-
-
-                if (
-                    reason.length >
-                    200
-                ) {
-
-                    reason =
-                        reason.substring(
-                            0,
-                            200
-                        );
-
-                }
-
-
-                if (
-                    description.length >
-                    1000
-                ) {
-
-                    description =
-                        description.substring(
-                            0,
-                            1000
-                        );
-
-                }
-
-
-                console.log(
-                    "================================"
-                );
-
-                console.log(
-                    "⚠️ NEUE MELDUNG"
-                );
-
-                console.log(
-                    "Melder:",
-                    reporterId
-                );
-
-                console.log(
-                    "Gemeldeter:",
-                    reportedId
-                );
-
-                console.log(
-                    "Grund:",
-                    reason
-                );
-
-                console.log(
-                    "Beschreibung:",
-                    description
-                );
-
-                console.log(
-                    "================================"
-                );
-
-
-                // 2 Stunden sperren
-                const until =
-                    Date.now() +
+            const minutes =
+                Math.floor(
                     (
-                        2 *
-                        60 *
-                        60 *
-                        1000
-                    );
-
-
-                userReports.set(
-                    reportedId,
-                    {
-                        until:
-                            until,
-
-                        reporterIds:
-                            new Set([
-                                reporterId
-                            ]),
-
-                        reason:
-                            reason,
-
-                        description:
-                            description,
-
-                        createdAt:
-                            Date.now()
-                    }
+                        totalSeconds % 3600
+                    ) / 60
                 );
 
 
-                // Melder blockiert den gemeldeten Benutzer
-                if (
-                    !blockedUsers.has(
-                        reporterId
-                    )
-                ) {
-
-                    blockedUsers.set(
-                        reporterId,
-                        new Set()
-                    );
-
-                }
+            const seconds =
+                totalSeconds % 60;
 
 
-                blockedUsers
-                    .get(reporterId)
-                    .add(
-                        reportedId
-                    );
+            banCountdown.textContent =
+                String(hours)
+                    .padStart(2, "0")
+                + ":" +
+                String(minutes)
+                    .padStart(2, "0")
+                + ":" +
+                String(seconds)
+                    .padStart(2, "0");
+
+        }
 
 
-                // Chat beenden
-                activeChats.delete(
-                    socket.id
-                );
-
-                activeChats.delete(
-                    partnerId
-                );
+        updateCountdown();
 
 
-                deleteChatFiles(
-                    socket.id
-                );
-
-                deleteChatFiles(
-                    partnerId
-                );
-
-
-                // Gemeldeten Benutzer informieren
-                const partnerSocket =
-                    io.sockets.sockets.get(
-                        partnerId
-                    );
-
-
-                if (
-                    partnerSocket
-                ) {
-
-                    partnerSocket.emit(
-                        "user banned",
-                        {
-                            remaining:
-                                2 *
-                                60 *
-                                60 *
-                                1000
-                        }
-                    );
-
-                }
-
-
-                // Melder bekommt Bestätigung
-                socket.emit(
-                    "report received",
-                    {
-                        success:
-                            true
-                    }
-                );
-
-
-                socket.emit(
-                    "chat left"
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // DATEI-UPLOAD SOCKET
-        // -------------------------------------------------
-
-        socket.on(
-            "upload file",
-            () => {
-
-                /*
-                 * Der eigentliche Upload
-                 * erfolgt über POST /upload.
-                 */
-
-                console.log(
-                    "📎 Datei-Upload:",
-                    socket.id
-                );
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // DISCONNECT
-        // -------------------------------------------------
-
-        socket.on(
-            "disconnect",
-            () => {
-
-                console.log(
-                    "🔴 Person getrennt:",
-                    socket.id
-                );
-
-
-                waitingUsers.delete(
-                    socket.id
-                );
-
-
-                leaveChat(
-                    socket
-                );
-
-
-                const permanentId =
-                    socketUserIds.get(
-                        socket.id
-                    );
-
-
-                if (
-                    permanentId
-                ) {
-
-                    if (
-                        onlineUsers.get(
-                            permanentId
-                        ) ===
-                        socket.id
-                    ) {
-
-                        onlineUsers.delete(
-                            permanentId
-                        );
-
-                    }
-
-                }
-
-
-                socketUserIds.delete(
-                    socket.id
-                );
-
-                io.emit(
-    "online users",
-    io.engine.clientsCount
-);
-
-
-            }
-        );
+        banTimer =
+            setInterval(
+                updateCountdown,
+                1000
+            );
 
     }
-);
 
 
-// =====================================================
-// HTTP DATEIUPLOAD
-// =====================================================
+    // =========================
+    // BAN ENDE
+    // =========================
 
-app.post(
-    "/upload",
-    (req, res, next) => {
+    function hideBan() {
 
-        upload.single(
-            "file"
-        )(
-            req,
-            res,
-            error => {
+        isBanned =
+            false;
 
-                if (error) {
 
-                    if (
-                        error.code ===
-                        "LIMIT_FILE_SIZE"
-                    ) {
+        banOverlay.style.display =
+            "none";
 
-                        return res
-                            .status(413)
-                            .json({
-                                error:
-                                    "Die Datei ist zu groß. Maximum: 10 MB."
-                            });
 
-                    }
+        nextButton.disabled =
+            true;
 
+        reportButton.disabled =
+            true;
 
-                    console.error(
-                        "Upload-Fehler:",
-                        error
-                    );
+        blockButton.disabled =
+            true;
 
+        messageInput.disabled =
+            true;
 
-                    return res
-                        .status(400)
-                        .json({
-                            error:
-                                "Datei konnte nicht hochgeladen werden."
-                        });
+        sendButton.disabled =
+            true;
 
-                }
 
+        partnerStatus.textContent =
+            "Sperre beendet";
 
-                next();
 
-            }
-        );
+        startButton.disabled =
+            false;
 
-    },
-    (req, res) => {
 
-        try {
-
-            const socketId =
-                req.body.socketId;
-
-
-            if (
-                typeof socketId !==
-                "string"
-            ) {
-
-                if (
-                    req.file
-                ) {
-
-                    try {
-
-                        fs.unlinkSync(
-                            req.file.path
-                        );
-
-                    } catch {}
-
-                }
-
-
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Ungültige Verbindung."
-                    });
-
-            }
-
-
-            const socket =
-                io.sockets.sockets.get(
-                    socketId
-                );
-
-
-            if (!socket) {
-
-                if (
-                    req.file
-                ) {
-
-                    try {
-
-                        fs.unlinkSync(
-                            req.file.path
-                        );
-
-                    } catch {}
-
-                }
-
-
-                return res
-                    .status(403)
-                    .json({
-                        error:
-                            "Ungültige Verbindung."
-                    });
-
-            }
-
-
-            const partnerId =
-                activeChats.get(
-                    socketId
-                );
-
-
-            if (!partnerId) {
-
-                if (
-                    req.file
-                ) {
-
-                    try {
-
-                        fs.unlinkSync(
-                            req.file.path
-                        );
-
-                    } catch {}
-
-                }
-
-
-                return res
-                    .status(403)
-                    .json({
-                        error:
-                            "Du bist aktuell in keinem Chat."
-                    });
-
-            }
-
-
-            if (
-                !req.file
-            ) {
-
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Keine Datei."
-                    });
-
-            }
-
-
-            const myPermanentId =
-                getPermanentId(
-                    socketId
-                );
-
-
-            const partnerPermanentId =
-                getPermanentId(
-                    partnerId
-                );
-
-
-            if (
-                isUserBanned(
-                    myPermanentId
-                )
-            ) {
-
-                fs.unlinkSync(
-                    req.file.path
-                );
-
-
-                return res
-                    .status(403)
-                    .json({
-                        error:
-                            "Du bist momentan gesperrt."
-                    });
-
-            }
-
-
-            if (
-                !myPermanentId ||
-                !partnerPermanentId
-            ) {
-
-                fs.unlinkSync(
-                    req.file.path
-                );
-
-
-                return res
-                    .status(403)
-                    .json({
-                        error:
-                            "Benutzer nicht registriert."
-                    });
-
-            }
-
-
-            // Chat-Dateien vorbereiten
-            if (
-                !chatFiles.has(
-                    socketId
-                )
-            ) {
-
-                chatFiles.set(
-                    socketId,
-                    new Set()
-                );
-
-            }
-
-
-            if (
-                !chatFiles.has(
-                    partnerId
-                )
-            ) {
-
-                chatFiles.set(
-                    partnerId,
-                    new Set()
-                );
-
-            }
-
-
-            chatFiles
-                .get(socketId)
-                .add(
-                    req.file.filename
-                );
-
-
-            chatFiles
-                .get(partnerId)
-                .add(
-                    req.file.filename
-                );
-
-
-            const fileId =
-                crypto
-                    .randomBytes(32)
-                    .toString("hex");
-
-
-            fileTokens.set(
-                fileId,
-                {
-
-                    filename:
-                        req.file.filename,
-
-                    owner:
-                        socketId,
-
-                    partner:
-                        partnerId,
-
-                    ownerPermanentId:
-                        myPermanentId,
-
-                    partnerPermanentId:
-                        partnerPermanentId,
-
-                    originalName:
-                        req.file.originalname,
-
-                    mimetype:
-                        req.file.mimetype,
-
-                    size:
-                        req.file.size,
-
-                    createdAt:
-                        Date.now()
-
-                }
-            );
-
-
-            const fileInfo = {
-
-                id:
-                    fileId,
-
-                name:
-                    req.file.originalname,
-
-                type:
-                    req.file.mimetype,
-
-                size:
-                    req.file.size,
-
-                url:
-                    `/file/${fileId}`
-
-            };
-
-
-            // Nur der Partner bekommt das
-            // "Datei erhalten"-Event
-            io.to(
-                partnerId
-            ).emit(
-                "file received",
-                fileInfo
-            );
-
-
-            // Absender bekommt Bestätigung
-            res.json({
-
-                success:
-                    true,
-
-                file:
-                    fileInfo
-
-            });
-
-
-        } catch (
-            error
-        ) {
-
-            console.error(
-                "Upload-Fehler:",
-                error
-            );
-
-
-            if (
-                req.file
-            ) {
-
-                try {
-
-                    fs.unlinkSync(
-                        req.file.path
-                    );
-
-                } catch {}
-
-            }
-
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        "Datei konnte nicht verarbeitet werden."
-                });
-
-        }
+        startScreen.style.display =
+            "flex";
 
     }
-);
 
 
-// =====================================================
-// DATEI AUSLIEFERN
-// =====================================================
+</script>
 
-app.get(
-    "/file/:id",
-    (req, res) => {
 
-        const file =
-            fileTokens.get(
-                req.params.id
-            );
-
-
-        if (!file) {
-
-            return res
-                .status(404)
-                .send(
-                    "Datei nicht gefunden."
-                );
-
-        }
-
-
-        const socketId =
-            req.query.socket;
-
-
-        if (
-            typeof socketId !==
-            "string"
-        ) {
-
-            return res
-                .status(403)
-                .send(
-                    "Zugriff verweigert."
-                );
-
-        }
-
-
-        const socket =
-            io.sockets.sockets.get(
-                socketId
-            );
-
-
-        if (!socket) {
-
-            return res
-                .status(403)
-                .send(
-                    "Zugriff verweigert."
-                );
-
-        }
-
-
-        const permanentId =
-            getPermanentId(
-                socketId
-            );
-
-
-        /*
-         * Zugriff nur für die beiden
-         * Benutzer dieses Chats.
-         */
-
-        if (
-            permanentId !==
-            file.ownerPermanentId &&
-            permanentId !==
-            file.partnerPermanentId
-        ) {
-
-            return res
-                .status(403)
-                .send(
-                    "Zugriff verweigert."
-                );
-
-        }
-
-
-        /*
-         * Zusätzlich prüfen,
-         * ob die beiden noch miteinander
-         * verbunden sind.
-         */
-
-        const currentPartner =
-            activeChats.get(
-                socketId
-            );
-
-
-        if (
-            socketId !==
-            file.owner &&
-            socketId !==
-            file.partner
-        ) {
-
-            return res
-                .status(403)
-                .send(
-                    "Zugriff verweigert."
-                );
-
-        }
-
-
-        if (
-            currentPartner !==
-            file.owner &&
-            currentPartner !==
-            file.partner
-        ) {
-
-            return res
-                .status(403)
-                .send(
-                    "Dieser Chat ist beendet."
-                );
-
-        }
-
-
-        const filePath =
-            path.join(
-                uploadFolder,
-                file.filename
-            );
-
-
-        if (
-            !fs.existsSync(
-                filePath
-            )
-        ) {
-
-            fileTokens.delete(
-                req.params.id
-            );
-
-
-            return res
-                .status(404)
-                .send(
-                    "Datei nicht gefunden."
-                );
-
-        }
-
-
-        res.setHeader(
-            "Content-Type",
-            file.mimetype
-        );
-
-
-        res.setHeader(
-            "Content-Disposition",
-            `inline; filename*=UTF-8''${encodeURIComponent(file.originalName)}`
-        );
-
-
-        res.sendFile(
-            filePath
-        );
-
-    }
-);
-
-
-// =====================================================
-// AUTOMATISCHE BEREINIGUNG ABGELAUFENER SPERREN
-// =====================================================
-
-setInterval(
-    () => {
-
-        const now =
-            Date.now();
-
-
-        for (
-            const [
-                permanentId,
-                report
-            ]
-            of userReports
-        ) {
-
-            if (
-                now >=
-                report.until
-            ) {
-
-                userReports.delete(
-                    permanentId
-                );
-
-
-                console.log(
-                    `🟢 2-Stunden-Sperre beendet: ${permanentId}`
-                );
-
-            }
-
-        }
-
-    },
-    60 * 1000
-);
-
-
-// =====================================================
-// SERVER START
-// =====================================================
-
-server.listen(
-    PORT,
-    () => {
-
-        console.log(
-            ""
-        );
-
-        console.log(
-            "===================================="
-        );
-
-        console.log(
-            "🚀 RANDOM CHAT SERVER"
-        );
-
-        console.log(
-            "===================================="
-        );
-
-        console.log(
-            `🌐 http://localhost:${PORT}`
-        );
-
-        console.log(
-            `📁 Uploads: ${uploadFolder}`
-        );
-
-        console.log(
-            "📦 Maximale Dateigröße: 10 MB"
-        );
-
-        console.log(
-            "🛡️ Meldesystem: 2 Stunden"
-        );
-
-        console.log(
-            "🆔 Permanente Browser-ID vorbereitet"
-        );
-
-        console.log(
-            "===================================="
-        );
-
-        console.log(
-            ""
-        );
-
-    }
-);
+</body>
+</html>
