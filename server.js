@@ -1,1852 +1,1371 @@
-<!DOCTYPE html>
-<html lang="de">
+const express = require('express');
+const http = require('http');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const { Server } = require('socket.io');
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-    <title>Random Chat</title>
+const PORT = process.env.PORT || 3000;
 
-    <style>
+// =========================
+// Einstellungen
+// =========================
 
-        * {
-            box-sizing: border-box;
-        }
+const BAN_DURATION = 2 * 60 * 60 * 1000; // 2 Stunden
 
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #0b1220;
-            color: white;
-            height: 100vh;
-            overflow: hidden;
-        }
+const OLLAMA_URL =
+    process.env.OLLAMA_URL ||
+    'http://127.0.0.1:11434';
 
-        /* =========================
-           HEADER
-        ========================= */
+const OLLAMA_MODEL =
+    process.env.OLLAMA_MODEL ||
+    'llama3.2';
 
-        header {
-            height: 70px;
-            background: #111827;
-            border-bottom: 1px solid #263247;
+const AI_TIMEOUT = 30000;
 
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
 
-            padding: 0 25px;
-        }
+// =========================
+// Dateien / Datenbank
+// =========================
 
-        .logo {
-            font-size: 22px;
-            font-weight: bold;
-        }
+const databaseDir =
+    path.join(__dirname, 'database');
 
-        .online {
-            color: #4ade80;
-            font-size: 14px;
-        }
+const databaseFile =
+    path.join(databaseDir, 'chat-data.json');
 
-        /* =========================
-           CHAT
-        ========================= */
+const uploadsDir =
+    path.join(__dirname, 'uploads');
 
-        .chat-container {
-            width: 100%;
-            max-width: 900px;
-            height: calc(100vh - 70px);
 
-            margin: auto;
+if (!fs.existsSync(databaseDir)) {
+    fs.mkdirSync(databaseDir, {
+        recursive: true
+    });
+}
 
-            display: flex;
-            flex-direction: column;
-        }
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, {
+        recursive: true
+    });
+}
 
-        .partner {
-            padding: 18px;
 
-            background: #172033;
-            border-bottom: 1px solid #263247;
+let database = {
+    bans: {},
+    blocks: {}
+};
 
-            font-weight: bold;
-        }
 
-        .messages {
-            flex: 1;
+try {
 
-            padding: 20px;
+    if (fs.existsSync(databaseFile)) {
 
-            overflow-y: auto;
-
-            display: flex;
-            flex-direction: column;
-
-            gap: 10px;
-        }
-
-        .message {
-            max-width: 70%;
-
-            padding: 12px 15px;
-
-            border-radius: 15px;
-
-            word-wrap: break-word;
-        }
-
-        .message.me {
-            align-self: flex-end;
-            background: #2563eb;
-        }
-
-        .message.partner {
-            align-self: flex-start;
-            background: #1f2937;
-        }
-
-        .time {
-            font-size: 10px;
-            opacity: 0.6;
-            margin-top: 5px;
-        }
-
-        /* =========================
-           INPUT
-        ========================= */
-
-        .input-area {
-            padding: 15px;
-
-            background: #111827;
-            border-top: 1px solid #263247;
-
-            display: flex;
-            gap: 10px;
-        }
-
-        .input-area input {
-            flex: 1;
-
-            padding: 14px;
-
-            border: none;
-            outline: none;
-
-            border-radius: 10px;
-
-            background: #1f2937;
-            color: white;
-
-            font-size: 15px;
-        }
-
-        button {
-            border: none;
-
-            padding: 12px 18px;
-
-            border-radius: 10px;
-
-            cursor: pointer;
-
-            font-weight: bold;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .send {
-            background: #2563eb;
-            color: white;
-        }
-
-        .next {
-            background: #374151;
-            color: white;
-        }
-
-        .report {
-            background: #dc2626;
-            color: white;
-        }
-
-        .block {
-            background: #4b5563;
-            color: white;
-        }
-
-        /* =========================
-           START SCREEN
-        ========================= */
-
-        .start-screen {
-            position: fixed;
-            inset: 0;
-
-            display: flex;
-
-            justify-content: center;
-            align-items: center;
-
-            background:
-                radial-gradient(
-                    circle at 50% 40%,
-                    rgba(37, 99, 235, 0.12),
-                    transparent 40%
-                ),
-                #0b1220;
-
-            z-index: 10;
-        }
-
-        .start-box {
-            width: 90%;
-            max-width: 500px;
-
-            padding: 45px 40px;
-
-            text-align: center;
-
-            background: rgba(17, 24, 39, 0.95);
-
-            border: 1px solid #263247;
-
-            border-radius: 24px;
-
-            box-shadow:
-                0 25px 80px rgba(0, 0, 0, 0.45),
-                0 0 50px rgba(37, 99, 235, 0.08);
-
-            backdrop-filter: blur(12px);
-        }
-
-        .start-icon {
-            width: 78px;
-            height: 78px;
-
-            margin: 0 auto 20px;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 20px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #3b82f6
-                );
-
-            font-size: 42px;
-
-            box-shadow:
-                0 10px 30px
-                rgba(37, 99, 235, 0.35);
-        }
-
-        .start-box h1 {
-            margin: 0;
-
-            font-size: 38px;
-            font-weight: 800;
-
-            letter-spacing: -1px;
-        }
-
-        .subtitle {
-            margin-top: 8px;
-
-            color: #93c5fd;
-
-            font-size: 17px;
-            font-weight: 600;
-        }
-
-        .server-status {
-            display: inline-flex;
-
-            align-items: center;
-
-            gap: 8px;
-
-            margin-top: 18px;
-
-            padding: 7px 13px;
-
-            border-radius: 999px;
-
-            background:
-                rgba(74, 222, 128, 0.08);
-
-            border:
-                1px solid
-                rgba(74, 222, 128, 0.18);
-
-            color: #4ade80;
-
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-
-            border-radius: 50%;
-
-            background: #4ade80;
-
-            box-shadow:
-                0 0 10px #4ade80;
-        }
-
-        .start-description {
-            margin: 25px 0 0;
-
-            color: #aeb8c9;
-
-            font-size: 15px;
-
-            line-height: 1.6;
-        }
-
-        .start-button {
-            width: 100%;
-
-            margin-top: 28px;
-
-            padding: 17px 20px;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            gap: 10px;
-
-            border: none;
-            border-radius: 13px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #3b82f6
-                );
-
-            color: white;
-
-            font-size: 17px;
-            font-weight: 700;
-
-            cursor: pointer;
-
-            box-shadow:
-                0 10px 25px
-                rgba(37, 99, 235, 0.25);
-        }
-
-        .button-arrow {
-            font-size: 21px;
-        }
-
-        .features {
-            display: flex;
-
-            justify-content: center;
-
-            gap: 22px;
-
-            margin-top: 25px;
-
-            padding-top: 22px;
-
-            border-top: 1px solid #263247;
-        }
-
-        .feature {
-            display: flex;
-
-            align-items: center;
-
-            gap: 6px;
-
-            color: #8994a8;
-
-            font-size: 12px;
-        }
-
-        .feature span:first-child {
-            color: #60a5fa;
-            font-size: 14px;
-        }
-
-        /* =========================
-           SUCHEN
-        ========================= */
-
-        .searching {
-            display: none;
-
-            position: fixed;
-
-            inset: 0;
-
-            background: #0b1220;
-
-            justify-content: center;
-            align-items: center;
-
-            z-index: 20;
-        }
-
-        .search-box {
-            text-align: center;
-        }
-
-        .loader {
-            width: 45px;
-            height: 45px;
-
-            border: 4px solid #374151;
-
-            border-top-color: #2563eb;
-
-            border-radius: 50%;
-
-            animation:
-                spin 1s linear infinite;
-
-            margin:
-                0 auto 20px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* =========================
-           BAN
-        ========================= */
-
-        #banOverlay {
-            position: fixed;
-
-            inset: 0;
-
-            background:
-                rgba(0, 0, 0, 0.85);
-
-            display: none;
-
-            justify-content: center;
-            align-items: center;
-
-            z-index: 99999;
-        }
-
-        #banBox {
-            width: 90%;
-            max-width: 430px;
-
-            background: #050505;
-
-            color: white;
-
-            border: 1px solid #333;
-
-            border-radius: 18px;
-
-            padding: 35px 30px;
-
-            text-align: center;
-
-            box-shadow:
-                0 20px 70px
-                rgba(0, 0, 0, 0.8);
-        }
-
-        .ban-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-
-        #banBox h2 {
-            margin: 10px 0 20px;
-            font-size: 26px;
-        }
-
-        .ban-text {
-            color: #aaa;
-            line-height: 1.5;
-        }
-
-        .reason {
-            margin-top: 20px;
-
-            background: #111;
-
-            border-radius: 10px;
-
-            padding: 14px;
-        }
-
-        .reason-title {
-            color: #777;
-
-            font-size: 12px;
-
-            text-transform: uppercase;
-
-            margin-bottom: 5px;
-        }
-
-        #banReason {
-            color: #fff;
-            word-break: break-word;
-        }
-
-        .countdown {
-            margin-top: 25px;
-
-            font-size: 42px;
-
-            font-weight: bold;
-
-            color: #ff4444;
-
-            font-variant-numeric:
-                tabular-nums;
-        }
-
-        .remaining {
-            color: #777;
-
-            font-size: 13px;
-
-            margin-top: 5px;
-        }
-
-        /* =========================
-           TOAST
-        ========================= */
-
-        #toast {
-            position: fixed;
-
-            left: 50%;
-            bottom: 25px;
-
-            transform: translateX(-50%);
-
-            background: #111827;
-
-            border: 1px solid #374151;
-
-            color: white;
-
-            padding: 12px 18px;
-
-            border-radius: 10px;
-
-            display: none;
-
-            z-index: 100000;
-
-            box-shadow:
-                0 10px 30px
-                rgba(0,0,0,0.4);
-        }
-
-        /* =========================
-           MOBILE
-        ========================= */
-
-        @media (max-width: 650px) {
-
-            header {
-                padding: 0 15px;
-            }
-
-            .message {
-                max-width: 85%;
-            }
-
-            .features {
-                gap: 12px;
-            }
-
-            .input-area {
-                padding: 10px;
-            }
-
-            .input-area button {
-                padding: 10px 12px;
-            }
-        }
-
-        @media (max-width: 600px) {
-
-            .start-box {
-                padding: 35px 22px;
-                border-radius: 20px;
-            }
-
-            .start-box h1 {
-                font-size: 31px;
-            }
-
-            .start-icon {
-                width: 65px;
-                height: 65px;
-
-                font-size: 34px;
-            }
-
-            .feature {
-                font-size: 11px;
-            }
-        }
-
-    </style>
-
-</head>
-
-
-<body>
-
-
-<header>
-
-    <div class="logo">
-        🎲 Random Chat
-    </div>
-
-    <div class="online">
-
-        <span id="headerStatusDot">
-            🟢
-        </span>
-
-        <span id="onlineUsers">
-            0
-        </span>
-
-        online
-
-    </div>
-
-</header>
-
-
-<!-- =========================
-     CHAT
-========================= -->
-
-<div class="chat-container">
-
-    <div
-        class="partner"
-        id="partnerStatus"
-    >
-        Kein Partner
-    </div>
-
-
-    <div
-        class="messages"
-        id="messages"
-    ></div>
-
-
-    <div class="input-area">
-
-        <input
-            id="messageInput"
-            type="text"
-            placeholder="Nachricht schreiben..."
-            autocomplete="off"
-            disabled
-        >
-
-        <button
-            class="send"
-            id="sendButton"
-            disabled
-        >
-            Senden
-        </button>
-
-    </div>
-
-
-    <div
-        class="input-area"
-        style="padding-top: 0;"
-    >
-
-        <button
-            class="next"
-            id="nextButton"
-            disabled
-        >
-            Nächster
-        </button>
-
-        <button
-            class="block"
-            id="blockButton"
-            disabled
-        >
-            🚫 Blockieren
-        </button>
-
-        <button
-            class="report"
-            id="reportButton"
-            disabled
-        >
-            🚩 Melden
-        </button>
-
-    </div>
-
-</div>
-
-
-<!-- =========================
-     START
-========================= -->
-
-<div
-    class="start-screen"
-    id="startScreen"
->
-
-    <div class="start-box">
-
-        <div class="start-icon">
-            🎲
-        </div>
-
-
-        <h1>
-            Random Chat
-        </h1>
-
-
-        <div class="subtitle">
-            Partner-Suche
-        </div>
-
-
-        <div class="server-status">
-
-            <span class="status-dot"></span>
-
-            <span id="serverStatus">
-                Server online
-            </span>
-
-        </div>
-
-
-        <p class="start-description">
-            Chatte anonym mit einer zufälligen Person.
-        </p>
-
-
-        <button
-            class="start-button"
-            id="startButton"
-        >
-
-            <span>
-                Partner suchen
-            </span>
-
-            <span class="button-arrow">
-                →
-            </span>
-
-        </button>
-
-
-        <div class="features">
-
-            <div class="feature">
-                <span>⚡</span>
-                <span>Schnell</span>
-            </div>
-
-            <div class="feature">
-                <span>1:1</span>
-                <span>1 zu 1</span>
-            </div>
-
-            <div class="feature">
-                <span>✓</span>
-                <span>Keine Anmeldung</span>
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- =========================
-     SUCHEN
-========================= -->
-
-<div
-    class="searching"
-    id="searching"
->
-
-    <div class="search-box">
-
-        <div class="loader"></div>
-
-        <h2>
-            Partner wird gesucht...
-        </h2>
-
-        <p>
-            Einen Moment bitte.
-        </p>
-
-    </div>
-
-</div>
-
-
-<!-- =========================
-     BAN
-========================= -->
-
-<div id="banOverlay">
-
-    <div id="banBox">
-
-        <div class="ban-icon">
-            🔒
-        </div>
-
-        <h2>
-            Du bist gesperrt
-        </h2>
-
-        <div class="ban-text">
-            Du kannst den Chat momentan nicht benutzen.
-        </div>
-
-        <div class="reason">
-
-            <div class="reason-title">
-                Grund
-            </div>
-
-            <div id="banReason">
-                Verstoß gegen die Chatregeln
-            </div>
-
-        </div>
-
-        <div
-            class="countdown"
-            id="banCountdown"
-        >
-            02:00:00
-        </div>
-
-        <div class="remaining">
-            verbleibende Sperrzeit
-        </div>
-
-    </div>
-
-</div>
-
-
-<div id="toast"></div>
-
-
-<!-- =========================
-     SOCKET.IO
-========================= -->
-
-<script src="/socket.io/socket.io.js"></script>
-
-
-<script>
-
-    const socket = io();
-
-
-    // =========================
-    // ELEMENTE
-    // =========================
-
-    const startScreen =
-        document.getElementById("startScreen");
-
-    const startButton =
-        document.getElementById("startButton");
-
-    const searching =
-        document.getElementById("searching");
-
-    const messages =
-        document.getElementById("messages");
-
-    const messageInput =
-        document.getElementById("messageInput");
-
-    const sendButton =
-        document.getElementById("sendButton");
-
-    const nextButton =
-        document.getElementById("nextButton");
-
-    const reportButton =
-        document.getElementById("reportButton");
-
-    const blockButton =
-        document.getElementById("blockButton");
-
-    const partnerStatus =
-        document.getElementById("partnerStatus");
-
-    const onlineUsers =
-        document.getElementById("onlineUsers");
-
-    const banOverlay =
-        document.getElementById("banOverlay");
-
-    const banReason =
-        document.getElementById("banReason");
-
-    const banCountdown =
-        document.getElementById("banCountdown");
-
-    const serverStatus =
-        document.getElementById("serverStatus");
-
-    const statusDot =
-        document.querySelector(".status-dot");
-
-    const toast =
-        document.getElementById("toast");
-
-
-    // =========================
-    // VARIABLEN
-    // =========================
-
-    let isBanned = false;
-
-    let banTimer = null;
-
-    let connectedToPartner = false;
-
-
-    // =========================
-    // TOAST
-    // =========================
-
-    function showToast(text) {
-
-        toast.textContent = text;
-
-        toast.style.display = "block";
-
-
-        setTimeout(() => {
-
-            toast.style.display = "none";
-
-        }, 3000);
-
-    }
-
-
-    // =========================
-    // SERVER VERBINDUNG
-    // =========================
-
-    socket.on(
-        "connect",
-        () => {
-
-            serverStatus.textContent =
-                "Server online";
-
-            statusDot.style.background =
-                "#4ade80";
-
-            statusDot.style.boxShadow =
-                "0 0 10px #4ade80";
-
-        }
-    );
-
-
-    socket.on(
-        "disconnect",
-        () => {
-
-            serverStatus.textContent =
-                "Server offline";
-
-            statusDot.style.background =
-                "#ef4444";
-
-            statusDot.style.boxShadow =
-                "0 0 10px #ef4444";
-
-            connectedToPartner = false;
-
-        }
-    );
-
-
-    // =========================
-    // ONLINE
-    // =========================
-
-    socket.on(
-        "online users",
-        (count) => {
-
-            onlineUsers.textContent =
-                count;
-
-        }
-    );
-
-
-    // =========================
-    // PARTNER SUCHEN
-    // =========================
-
-    startButton.addEventListener(
-        "click",
-        () => {
-
-            if (isBanned) {
-                return;
-            }
-
-            startButton.disabled = true;
-
-            searching.style.display =
-                "flex";
-
-            startScreen.style.display =
-                "none";
-
-            partnerStatus.textContent =
-                "🔎 Suche Partner...";
-
-            socket.emit(
-                "find partner"
-            );
-
-        }
-    );
-
-
-    // =========================
-    // WARTEN
-    // =========================
-
-    socket.on(
-        "waiting",
-        () => {
-
-            startScreen.style.display =
-                "none";
-
-            searching.style.display =
-                "flex";
-
-        }
-    );
-
-
-    // =========================
-    // PARTNER GEFUNDEN
-    // =========================
-
-    socket.on(
-        "partner found",
-        () => {
-
-            searching.style.display =
-                "none";
-
-            startScreen.style.display =
-                "none";
-
-            startButton.disabled =
-                false;
-
-            connectedToPartner =
-                true;
-
-            partnerStatus.textContent =
-                "🟢 Mit Partner verbunden";
-
-            messages.innerHTML = "";
-
-            messageInput.disabled =
-                false;
-
-            sendButton.disabled =
-                false;
-
-            nextButton.disabled =
-                false;
-
-            blockButton.disabled =
-                false;
-
-            reportButton.disabled =
-                false;
-
-            messageInput.focus();
-
-        }
-    );
-
-
-    // =========================
-    // NACHRICHT SENDEN
-    // =========================
-
-    function sendMessage() {
-
-        if (
-            isBanned ||
-            !connectedToPartner
-        ) {
-            return;
-        }
-
-
-        const text =
-            messageInput.value.trim();
-
-
-        if (!text) {
-            return;
-        }
-
-
-        socket.emit(
-            "chat message",
-            {
-                text: text
-            }
-        );
-
-
-        addMessage(
-            text,
-            true,
-            new Date().toLocaleTimeString(
-                "de-DE",
-                {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                }
+        database = JSON.parse(
+            fs.readFileSync(
+                databaseFile,
+                'utf8'
             )
         );
 
+    }
 
-        messageInput.value = "";
+} catch (error) {
+
+    console.log(
+        '⚠️ Datenbank konnte nicht gelesen werden:',
+        error.message
+    );
+
+    database = {
+        bans: {},
+        blocks: {}
+    };
+}
+
+
+if (!database.bans) {
+    database.bans = {};
+}
+
+if (!database.blocks) {
+    database.blocks = {};
+}
+
+
+function saveDatabase() {
+
+    try {
+
+        fs.writeFileSync(
+            databaseFile,
+            JSON.stringify(
+                database,
+                null,
+                2
+            ),
+            'utf8'
+        );
+
+    } catch (error) {
+
+        console.log(
+            '❌ Datenbank konnte nicht gespeichert werden:',
+            error.message
+        );
+
+    }
+
+}
+
+
+// =========================
+// Express
+// =========================
+
+app.use(
+    express.json({
+        limit: '2mb'
+    })
+);
+
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
+
+app.use(
+    '/uploads',
+    express.static(uploadsDir)
+);
+
+app.use(
+    express.static(__dirname)
+);
+
+
+app.get('/', (req, res) => {
+
+    res.sendFile(
+        path.join(
+            __dirname,
+            'index.html'
+        )
+    );
+
+});
+
+
+// =========================
+// Benutzer-ID
+// =========================
+
+function getDeviceId(socket) {
+
+    const cookie =
+        socket.handshake.headers.cookie || '';
+
+    const match =
+        cookie.match(
+            /(?:^|;\s*)randomchat_user_id=([^;]+)/
+        );
+
+
+    if (match && match[1]) {
+
+        return decodeURIComponent(
+            match[1]
+        );
 
     }
 
 
-    sendButton.addEventListener(
-        "click",
-        sendMessage
-    );
+    return crypto.randomUUID();
+
+}
 
 
-    messageInput.addEventListener(
-        "keydown",
-        (event) => {
+// =========================
+// Sperren
+// =========================
 
-            if (
-                event.key === "Enter"
-            ) {
+function getBanInfo(deviceId) {
 
-                event.preventDefault();
-
-                sendMessage();
-
-            }
-
-        }
-    );
+    const expiresAt =
+        Number(
+            database.bans[deviceId] || 0
+        );
 
 
-    // =========================
-    // NACHRICHT EMPFANGEN
-    // =========================
+    if (!expiresAt) {
 
-    socket.on(
-        "chat message",
-        (data) => {
+        return {
+            banned: false,
+            remaining: 0
+        };
 
-            addMessage(
-                data.text || "",
-                false,
-                new Date().toLocaleTimeString(
-                    "de-DE",
-                    {
-                        hour: "2-digit",
-                        minute: "2-digit"
-                    }
-                )
-            );
-
-        }
-    );
+    }
 
 
-    // =========================
-    // NACHRICHT ANZEIGEN
-    // =========================
+    if (expiresAt <= Date.now()) {
 
-    function addMessage(
-        text,
-        own,
-        time
+        delete database.bans[deviceId];
+
+        saveDatabase();
+
+        return {
+            banned: false,
+            remaining: 0
+        };
+
+    }
+
+
+    return {
+
+        banned: true,
+
+        remaining:
+            expiresAt - Date.now(),
+
+        expiresAt
+
+    };
+
+}
+
+
+function banUser(deviceId) {
+
+    const expiresAt =
+        Date.now() + BAN_DURATION;
+
+
+    database.bans[deviceId] =
+        expiresAt;
+
+
+    saveDatabase();
+
+
+    return expiresAt;
+
+}
+
+
+// =========================
+// Blockieren
+// =========================
+
+function blockUser(
+    blockerId,
+    blockedId
+) {
+
+    if (!database.blocks[blockerId]) {
+
+        database.blocks[blockerId] = [];
+
+    }
+
+
+    if (
+        !database.blocks[blockerId]
+            .includes(blockedId)
     ) {
 
-        const wrapper =
-            document.createElement(
-                "div"
-            );
+        database.blocks[blockerId]
+            .push(blockedId);
+
+        saveDatabase();
+
+    }
+
+}
 
 
-        wrapper.className =
-            "message " +
-            (
-                own
-                    ? "me"
-                    : "partner"
-            );
+function isBlocked(a, b) {
+
+    return Boolean(
+
+        database.blocks[a]
+            ?.includes(b)
+
+        ||
+
+        database.blocks[b]
+            ?.includes(a)
+
+    );
+
+}
 
 
-        const textElement =
-            document.createElement(
-                "div"
-            );
+// =========================
+// Chat-Verwaltung
+// =========================
+
+const waitingUsers = [];
+
+const rooms = new Map();
+
+const socketUsers = new Map();
 
 
-        textElement.textContent =
-            text;
+function updateOnlineUsers() {
+
+    io.emit(
+        'online users',
+        io.engine.clientsCount
+    );
+
+}
 
 
-        const timeElement =
-            document.createElement(
-                "div"
-            );
+function removeFromWaiting(socketId) {
 
-
-        timeElement.className =
-            "time";
-
-
-        timeElement.textContent =
-            time;
-
-
-        wrapper.appendChild(
-            textElement
+    const index =
+        waitingUsers.indexOf(
+            socketId
         );
 
 
-        wrapper.appendChild(
-            timeElement
+    if (index !== -1) {
+
+        waitingUsers.splice(
+            index,
+            1
         );
 
+    }
 
-        messages.appendChild(
-            wrapper
-        );
+}
 
 
-        messages.scrollTop =
-            messages.scrollHeight;
+function getPartnerId(socketId) {
+
+    const room =
+        rooms.get(socketId);
+
+
+    if (!room) {
+
+        return null;
 
     }
 
 
-    // =========================
-    // NÄCHSTER PARTNER
-    // =========================
+    return room.users.find(
+        id => id !== socketId
+    ) || null;
 
-    nextButton.addEventListener(
-        "click",
-        () => {
-
-            if (isBanned) {
-                return;
-            }
+}
 
 
-            if (!connectedToPartner) {
-                return;
-            }
+function endRoom(
+    socketId,
+    reason = 'Chat beendet.'
+) {
+
+    const room =
+        rooms.get(socketId);
 
 
-            socket.emit(
-                "next partner"
+    if (!room) {
+
+        return;
+
+    }
+
+
+    for (
+        const userId
+        of room.users
+    ) {
+
+        rooms.delete(
+            userId
+        );
+
+
+        const userSocket =
+            io.sockets.sockets.get(
+                userId
             );
 
 
-            connectedToPartner =
+        if (userSocket) {
+
+            userSocket.data.inChat =
                 false;
 
 
-            messageInput.disabled =
-                true;
-
-            sendButton.disabled =
-                true;
-
-            blockButton.disabled =
-                true;
-
-            reportButton.disabled =
-                true;
-
-
-            messages.innerHTML = "";
-
-            partnerStatus.textContent =
-                "🔎 Suche neuen Partner...";
-
-
-            searching.style.display =
-                "flex";
-
-
-            setTimeout(
-                () => {
-
-                    socket.emit(
-                        "find partner"
-                    );
-
-                },
-                200
-            );
-
-        }
-    );
-
-
-    // =========================
-    // CHAT BEENDET
-    // =========================
-
-    socket.on(
-        "chat ended",
-        (data) => {
-
-            connectedToPartner =
-                false;
-
-
-            messageInput.disabled =
-                true;
-
-            sendButton.disabled =
-                true;
-
-            blockButton.disabled =
-                true;
-
-            reportButton.disabled =
-                true;
-
-
-            partnerStatus.textContent =
-                data?.reason ||
-                "Chat beendet.";
-
-        }
-    );
-
-
-    // =========================
-    // BLOCKIEREN
-    // =========================
-
-    blockButton.addEventListener(
-        "click",
-        () => {
-
-            if (
-                isBanned ||
-                !connectedToPartner
-            ) {
-                return;
-            }
-
-
-            socket.emit(
-                "block partner"
-            );
-
-        }
-    );
-
-
-    socket.on(
-        "partner blocked",
-        () => {
-
-            connectedToPartner =
-                false;
-
-
-            partnerStatus.textContent =
-                "🚫 Partner wurde blockiert.";
-
-            messages.innerHTML = "";
-
-
-            messageInput.disabled =
-                true;
-
-            sendButton.disabled =
-                true;
-
-            blockButton.disabled =
-                true;
-
-            reportButton.disabled =
-                true;
-
-
-            showToast(
-                "🚫 Partner blockiert."
-            );
-
-        }
-    );
-
-
-    // =========================
-    // MELDEN
-    // =========================
-
-    reportButton.addEventListener(
-        "click",
-        () => {
-
-            if (
-                isBanned ||
-                !connectedToPartner
-            ) {
-                return;
-            }
-
-
-            const reason =
-                prompt(
-                    "Warum möchtest du diesen Benutzer melden?"
-                );
-
-
-            if (
-                reason === null
-            ) {
-                return;
-            }
-
-
-            const cleanReason =
-                reason.trim();
-
-
-            if (!cleanReason) {
-
-                showToast(
-                    "Bitte einen Grund angeben."
-                );
-
-                return;
-
-            }
-
-
-            socket.emit(
-                "report partner",
+            userSocket.emit(
+                'chat ended',
                 {
-                    reason:
-                        cleanReason
+                    reason
                 }
             );
 
         }
-    );
 
+    }
 
-    // =========================
-    // KI PRÜFT MELDUNG
-    // =========================
+}
 
-    socket.on(
-        "report checking",
-        () => {
 
-            reportButton.disabled =
-                true;
+function cleanText(
+    value,
+    max = 2000
+) {
 
-            blockButton.disabled =
-                true;
+    if (
+        typeof value !==
+        'string'
+    ) {
 
-            nextButton.disabled =
-                true;
+        return '';
 
-            partnerStatus.textContent =
-                "🤖 Meldung wird geprüft...";
+    }
 
-            showToast(
-                "🤖 Die KI prüft die Meldung..."
-            );
 
-        }
-    );
+    return value
+        .trim()
+        .slice(0, max);
 
+}
 
-    // =========================
-    // MELDUNG ABGELEHNT
-    // =========================
 
-    socket.on(
-        "report rejected",
-        () => {
+// =========================
+// KI-MODERATION
+// =========================
 
-            reportButton.disabled =
-                false;
+async function moderateReport(
+    messages,
+    reason,
+    reporterId
+) {
 
-            blockButton.disabled =
-                false;
+    const transcript =
+        messages.map(
+            message => {
 
-            nextButton.disabled =
-                false;
+                const who =
+                    message.senderId ===
+                    reporterId
 
-            partnerStatus.textContent =
-                "🟢 Meldung wurde abgelehnt.";
+                    ? 'MELDENDER BENUTZER'
 
-            showToast(
-                "Die KI hat die Meldung nicht bestätigt."
-            );
+                    : 'GEMELDETER BENUTZER';
 
-        }
-    );
 
-
-    // =========================
-    // MELDUNG FEHLER
-    // =========================
-
-    socket.on(
-        "report error",
-        (data) => {
-
-            reportButton.disabled =
-                false;
-
-            blockButton.disabled =
-                false;
-
-            nextButton.disabled =
-                false;
-
-            partnerStatus.textContent =
-                "⚠️ Meldung konnte nicht geprüft werden.";
-
-            showToast(
-                data?.message ||
-                "Fehler bei der Prüfung."
-            );
-
-        }
-    );
-
-
-    // =========================
-    // MELDUNG BESTÄTIGT
-    // =========================
-
-    socket.on(
-        "report saved",
-        () => {
-
-            partnerStatus.textContent =
-                "🚩 Meldung bestätigt.";
-
-            showToast(
-                "🚩 Die Meldung wurde bestätigt."
-            );
-
-        }
-    );
-
-
-    socket.on(
-        "report chat ended",
-        () => {
-
-            connectedToPartner =
-                false;
-
-
-            messageInput.disabled =
-                true;
-
-            sendButton.disabled =
-                true;
-
-            blockButton.disabled =
-                true;
-
-            reportButton.disabled =
-                true;
-
-            nextButton.disabled =
-                true;
-
-
-            messages.innerHTML = "";
-
-            partnerStatus.textContent =
-                "Chat beendet.";
-
-        }
-    );
-
-
-    // =========================
-    // GESPERRT
-    // =========================
-
-    socket.on(
-        "user banned",
-        (data) => {
-
-            showBan(data);
-
-        }
-    );
-
-
-    // =========================
-    // BAN ANZEIGEN
-    // =========================
-
-    function showBan(data) {
-
-        isBanned =
-            true;
-
-        connectedToPartner =
-            false;
-
-
-        startScreen.style.display =
-            "none";
-
-        searching.style.display =
-            "none";
-
-
-        messageInput.disabled =
-            true;
-
-        sendButton.disabled =
-            true;
-
-        nextButton.disabled =
-            true;
-
-        reportButton.disabled =
-            true;
-
-        blockButton.disabled =
-            true;
-
-
-        banReason.textContent =
-            data?.reason ||
-            "Verstoß gegen die Chatregeln";
-
-
-        banOverlay.style.display =
-            "flex";
-
-
-        if (banTimer) {
-
-            clearInterval(
-                banTimer
-            );
-
-        }
-
-
-        const remaining =
-            Number(
-                data?.remaining || 0
-            );
-
-
-        const expiresAt =
-            Number(
-                data?.expiresAt ||
-                Date.now() + remaining
-            );
-
-
-        function updateCountdown() {
-
-            const left =
-                Math.max(
-                    0,
-                    expiresAt -
-                    Date.now()
+                return (
+                    `${who}: ${message.text}`
                 );
-
-
-            if (left <= 0) {
-
-                clearInterval(
-                    banTimer
-                );
-
-                banTimer = null;
-
-                hideBan();
-
-                return;
 
             }
+        ).join('\n');
 
 
-            const totalSeconds =
-                Math.ceil(
-                    left / 1000
-                );
+    const prompt = `Du bist ein Moderationssystem für einen anonymen 1-zu-1-Chat.
+
+Prüfe eine Meldung anhand des Chatverlaufs und des angegebenen Meldegrundes.
+
+Meldegrund:
+${reason}
+
+Chatverlauf:
+${transcript || '(Kein Chatverlauf vorhanden)'}
+
+Entscheide nur anhand der vorhandenen Informationen.
+
+Eine Meldung ist JUSTIFIED, wenn der gemeldete Benutzer tatsächlich gegen normale Chat-Regeln verstößt, zum Beispiel durch schwere Beleidigungen, Drohungen, Belästigung oder eindeutig unzulässiges Verhalten.
+
+Wenn die Meldung nicht ausreichend begründet ist, antworte NOT_JUSTIFIED.
+
+Antworte ausschließlich mit genau einem Wort:
+
+JUSTIFIED
+
+oder
+
+NOT_JUSTIFIED`;
 
 
-            const hours =
-                Math.floor(
-                    totalSeconds / 3600
-                );
+    const controller =
+        new AbortController();
 
 
-            const minutes =
-                Math.floor(
-                    (
-                        totalSeconds % 3600
-                    ) / 60
-                );
+    const timeout =
+        setTimeout(
+            () => controller.abort(),
+            AI_TIMEOUT
+        );
 
 
-            const seconds =
-                totalSeconds % 60;
+    try {
+
+        const response =
+            await fetch(
+                `${OLLAMA_URL}/api/chat`,
+                {
+
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    signal:
+                        controller.signal,
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                OLLAMA_MODEL,
+
+                            stream:
+                                false,
+
+                            messages: [
+
+                                {
+                                    role:
+                                        'system',
+
+                                    content:
+                                        'Du bist ein strenges, neutrales Moderationssystem.'
+                                },
+
+                                {
+                                    role:
+                                        'user',
+
+                                    content:
+                                        prompt
+                                }
+
+                            ],
+
+                            options: {
+                                temperature: 0
+                            }
+
+                        })
+
+                }
+            );
 
 
-            banCountdown.textContent =
-                String(hours)
-                    .padStart(2, "0")
-                + ":" +
-                String(minutes)
-                    .padStart(2, "0")
-                + ":" +
-                String(seconds)
-                    .padStart(2, "0");
+        if (!response.ok) {
+
+            throw new Error(
+                `Ollama HTTP ${response.status}`
+            );
 
         }
 
 
-        updateCountdown();
+        const data =
+            await response.json();
 
 
-        banTimer =
-            setInterval(
-                updateCountdown,
-                1000
+        const answer =
+            String(
+                data?.message?.content ||
+                ''
+            )
+                .trim()
+                .toUpperCase();
+
+
+        if (
+            answer.includes(
+                'JUSTIFIED'
+            )
+            &&
+            !answer.includes(
+                'NOT_JUSTIFIED'
+            )
+        ) {
+
+            return true;
+
+        }
+
+
+        if (
+            answer.includes(
+                'NOT_JUSTIFIED'
+            )
+        ) {
+
+            return false;
+
+        }
+
+
+        return false;
+
+    } finally {
+
+        clearTimeout(
+            timeout
+        );
+
+    }
+
+}
+
+
+// =========================
+// Socket.IO
+// =========================
+
+io.on(
+    'connection',
+    socket => {
+
+        const deviceId =
+            getDeviceId(socket);
+
+
+        socket.data.deviceId =
+            deviceId;
+
+
+        socket.data.inChat =
+            false;
+
+
+        socketUsers.set(
+            socket.id,
+            deviceId
+        );
+
+
+        console.log(
+            '🟢 Verbindung:',
+            socket.id
+        );
+
+
+        console.log(
+            '🆔 Benutzer:',
+            deviceId
+        );
+
+
+        updateOnlineUsers();
+
+
+        const ban =
+            getBanInfo(deviceId);
+
+
+        if (ban.banned) {
+
+            socket.emit(
+                'user banned',
+                {
+
+                    remaining:
+                        ban.remaining,
+
+                    expiresAt:
+                        ban.expiresAt
+
+                }
             );
 
+        }
+
+
+        // =====================
+        // Partner suchen
+        // =====================
+
+        socket.on(
+            'find partner',
+            () => {
+
+                const currentBan =
+                    getBanInfo(
+                        deviceId
+                    );
+
+
+                if (
+                    currentBan.banned
+                ) {
+
+                    socket.emit(
+                        'user banned',
+                        {
+
+                            remaining:
+                                currentBan.remaining,
+
+                            expiresAt:
+                                currentBan.expiresAt
+
+                        }
+                    );
+
+                    return;
+
+                }
+
+
+                if (
+                    socket.data.inChat
+                ) {
+
+                    return;
+
+                }
+
+
+                removeFromWaiting(
+                    socket.id
+                );
+
+
+                for (
+                    let i = 0;
+                    i < waitingUsers.length;
+                    i++
+                ) {
+
+                    const partnerId =
+                        waitingUsers[i];
+
+
+                    const partner =
+                        io.sockets.sockets.get(
+                            partnerId
+                        );
+
+
+                    if (
+                        !partner ||
+                        partner.id === socket.id ||
+                        partner.data.inChat
+                    ) {
+
+                        waitingUsers.splice(
+                            i,
+                            1
+                        );
+
+                        i--;
+
+                        continue;
+
+                    }
+
+
+                    const partnerBan =
+                        getBanInfo(
+                            partner.data.deviceId
+                        );
+
+
+                    if (
+                        partnerBan.banned ||
+                        isBlocked(
+                            deviceId,
+                            partner.data.deviceId
+                        )
+                    ) {
+
+                        console.log(
+                            '🚫 Partner übersprungen'
+                        );
+
+                        continue;
+
+                    }
+
+
+                    waitingUsers.splice(
+                        i,
+                        1
+                    );
+
+
+                    const room = {
+
+                        users: [
+                            socket.id,
+                            partner.id
+                        ],
+
+                        messages: [],
+
+                        reportInProgress:
+                            false
+
+                    };
+
+
+                    rooms.set(
+                        socket.id,
+                        room
+                    );
+
+
+                    rooms.set(
+                        partner.id,
+                        room
+                    );
+
+
+                    socket.data.inChat =
+                        true;
+
+
+                    partner.data.inChat =
+                        true;
+
+
+                    socket.emit(
+                        'partner found'
+                    );
+
+
+                    partner.emit(
+                        'partner found'
+                    );
+
+
+                    console.log(
+                        '💬 Chat:',
+                        socket.id,
+                        '<->',
+                        partner.id
+                    );
+
+
+                    return;
+
+                }
+
+
+                waitingUsers.push(
+                    socket.id
+                );
+
+
+                socket.emit(
+                    'waiting'
+                );
+
+
+                console.log(
+                    '⏳ Wartet:',
+                    socket.id
+                );
+
+            }
+        );
+
+
+        // =====================
+        // Nachricht
+        // =====================
+
+        socket.on(
+            'chat message',
+            data => {
+
+                const room =
+                    rooms.get(
+                        socket.id
+                    );
+
+
+                if (
+                    !room ||
+                    room.reportInProgress
+                ) {
+
+                    return;
+
+                }
+
+
+                const text =
+                    cleanText(
+                        data?.text
+                    );
+
+
+                if (!text) {
+
+                    return;
+
+                }
+
+
+                const partnerId =
+                    getPartnerId(
+                        socket.id
+                    );
+
+
+                if (!partnerId) {
+
+                    return;
+
+                }
+
+
+                const message = {
+
+                    senderId:
+                        socket.id,
+
+                    text,
+
+                    time:
+                        Date.now()
+
+                };
+
+
+                room.messages.push(
+                    message
+                );
+
+
+                if (
+                    room.messages.length >
+                    100
+                ) {
+
+                    room.messages.shift();
+
+                }
+
+
+                const partner =
+                    io.sockets.sockets.get(
+                        partnerId
+                    );
+
+
+                if (partner) {
+
+                    partner.emit(
+                        'chat message',
+                        {
+                            text
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+
+        // =====================
+        // Tippen
+        // =====================
+
+        socket.on(
+            'typing',
+            isTyping => {
+
+                const partnerId =
+                    getPartnerId(
+                        socket.id
+                    );
+
+
+                if (!partnerId) {
+
+                    return;
+
+                }
+
+
+                const partner =
+                    io.sockets.sockets.get(
+                        partnerId
+                    );
+
+
+                if (partner) {
+
+                    partner.emit(
+                        'typing',
+                        Boolean(
+                            isTyping
+                        )
+                    );
+
+                }
+
+            }
+        );
+
+
+        // =====================
+        // Melden
+        // =====================
+
+        socket.on(
+            'report partner',
+            async data => {
+
+                const room =
+                    rooms.get(
+                        socket.id
+                    );
+
+
+                if (!room) {
+
+                    return;
+
+                }
+
+
+                if (
+                    room.reportInProgress
+                ) {
+
+                    return;
+
+                }
+
+
+                const partnerId =
+                    getPartnerId(
+                        socket.id
+                    );
+
+
+                const partner =
+                    partnerId
+                        ? io.sockets.sockets.get(
+                            partnerId
+                        )
+                        : null;
+
+
+                if (!partner) {
+
+                    return;
+
+                }
+
+
+                const reason =
+                    cleanText(
+                        data?.reason,
+                        500
+                    )
+                    ||
+                    'Kein Grund angegeben';
+
+
+                room.reportInProgress =
+                    true;
+
+
+                socket.emit(
+                    'report checking'
+                );
+
+
+                console.log(
+                    '🚩 Meldung:',
+                    socket.id
+                );
+
+
+                console.log(
+                    'Grund:',
+                    reason
+                );
+
+
+                try {
+
+                    const justified =
+                        await moderateReport(
+                            room.messages,
+                            reason,
+                            socket.id
+                        );
+
+
+                    if (!justified) {
+
+                        room.reportInProgress =
+                            false;
+
+
+                        socket.emit(
+                            'report rejected'
+                        );
+
+
+                        console.log(
+                            '🤖 Meldung abgelehnt'
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    const expiresAt =
+                        banUser(
+                            partner.data.deviceId
+                        );
+
+
+                    partner.emit(
+                        'user banned',
+                        {
+
+                            remaining:
+                                BAN_DURATION,
+
+                            expiresAt
+
+                        }
+                    );
+
+
+                    socket.emit(
+                        'report saved'
+                    );
+
+
+                    socket.emit(
+                        'report chat ended'
+                    );
+
+
+                    console.log(
+                        '🤖 Meldung bestätigt'
+                    );
+
+
+                    endRoom(
+                        socket.id,
+                        'Die Meldung wurde bestätigt.'
+                    );
+
+
+                } catch (error) {
+
+                    room.reportInProgress =
+                        false;
+
+
+                    console.log(
+                        '❌ KI-Fehler:',
+                        error.message
+                    );
+
+
+                    socket.emit(
+                        'report error',
+                        {
+
+                            message:
+                                'Die KI konnte die Meldung gerade nicht prüfen.'
+
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+
+        // =====================
+        // Partner blockieren
+        // =====================
+
+        socket.on(
+            'block partner',
+            () => {
+
+                const partnerId =
+                    getPartnerId(
+                        socket.id
+                    );
+
+
+                if (!partnerId) {
+
+                    return;
+
+                }
+
+
+                const partner =
+                    io.sockets.sockets.get(
+                        partnerId
+                    );
+
+
+                if (!partner) {
+
+                    return;
+
+                }
+
+
+                blockUser(
+                    deviceId,
+                    partner.data.deviceId
+                );
+
+
+                socket.emit(
+                    'partner blocked'
+                );
+
+
+                endRoom(
+                    socket.id,
+                    'Partner wurde blockiert.'
+                );
+
+            }
+        );
+
+
+        // =====================
+        // Nächster Partner
+        // =====================
+
+        socket.on(
+            'next partner',
+            () => {
+
+                endRoom(
+                    socket.id,
+                    'Chat beendet.'
+                );
+
+
+                socket.data.inChat =
+                    false;
+
+            }
+        );
+
+
+        // =====================
+        // Chat verlassen
+        // =====================
+
+        socket.on(
+            'leave chat',
+            () => {
+
+                endRoom(
+                    socket.id,
+                    'Chat verlassen.'
+                );
+
+
+                socket.data.inChat =
+                    false;
+
+            }
+        );
+
+
+        // =====================
+        // Disconnect
+        // =====================
+
+        socket.on(
+            'disconnect',
+            () => {
+
+                removeFromWaiting(
+                    socket.id
+                );
+
+
+                endRoom(
+                    socket.id,
+                    'Verbindung getrennt.'
+                );
+
+
+                socketUsers.delete(
+                    socket.id
+                );
+
+
+                updateOnlineUsers();
+
+
+                console.log(
+                    '🔴 Getrennt:',
+                    socket.id
+                );
+
+            }
+        );
+
     }
+);
 
 
-    // =========================
-    // BAN ENDE
-    // =========================
+// =========================
+// Server starten
+// =========================
 
-    function hideBan() {
+server.listen(
+    PORT,
+    '0.0.0.0',
+    () => {
 
-        isBanned =
-            false;
+        console.log(
+            '======================================'
+        );
 
+        console.log(
+            `🚀 Server läuft auf http://localhost:${PORT}`
+        );
 
-        banOverlay.style.display =
-            "none";
+        console.log(
+            '💬 1-zu-1 Random Chat'
+        );
 
+        console.log(
+            '🤖 KI-Moderation über Ollama'
+        );
 
-        nextButton.disabled =
-            true;
+        console.log(
+            '🚫 Sperre: 2 Stunden'
+        );
 
-        reportButton.disabled =
-            true;
-
-        blockButton.disabled =
-            true;
-
-        messageInput.disabled =
-            true;
-
-        sendButton.disabled =
-            true;
-
-
-        partnerStatus.textContent =
-            "Sperre beendet";
-
-
-        startButton.disabled =
-            false;
-
-
-        startScreen.style.display =
-            "flex";
+        console.log(
+            '======================================'
+        );
 
     }
-
-
-</script>
-
-
-</body>
-</html>
+);
